@@ -28,6 +28,7 @@ export default function AboutPage() {
           <p className="mt-3">
             Our tool automatically detects lines with trailing spaces, removes the extra
             whitespace, and adds a period — making your text clean and ready to use.
+            It can also strip emojis and format markdown headings with horizontal rules.
           </p>
         </section>
 

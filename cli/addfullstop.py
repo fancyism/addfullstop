@@ -1,18 +1,18 @@
 """
-AddFullStop CLI — Fix trailing-space lines and remove emojis from ChatGPT output.
+AddFullStop CLI — Fix trailing-space lines, remove emojis, format headings from ChatGPT output.
 
 Usage:
-  # From clipboard (fix spaces + remove emojis):
-  python addfullstop.py --clipboard --emoji
+  # From clipboard (all features):
+  python addfullstop.py --clipboard --emoji --hr
 
   # From file:
   python addfullstop.py -i input.txt -o output.txt
 
-  # From file, remove emojis only:
-  python addfullstop.py -i input.txt --emoji --no-fix-spaces
+  # From file, remove emojis + horizontal rules:
+  python addfullstop.py -i input.txt --emoji --hr --no-fix-spaces
 
   # Pipe:
-  cat input.txt | python addfullstop.py --stdin --emoji
+  cat input.txt | python addfullstop.py --stdin --emoji --hr
 """
 
 import argparse
@@ -133,6 +133,29 @@ def fix_trailing_spaces(text: str) -> tuple[str, int]:
     return "\n".join(result), fixed_count
 
 
+def add_horizontal_rule(text: str) -> tuple[str, int]:
+    """Insert '---' before lines starting with '#', with 1 blank-line gap.
+
+    Returns (processed_text, number_of_headings_processed).
+    """
+    lines = text.split("\n")
+    result = []
+    heading_count = 0
+
+    for i, line in enumerate(lines):
+        if re.match(r"^#{1,6}\s", line):
+            heading_count += 1
+            # Remove preceding blank lines or '.'-only lines
+            while result and (result[-1].strip() == "" or result[-1].strip() == "."):
+                result.pop()
+            # Add 1 blank-line gap + ---
+            result.append(".")
+            result.append("---")
+        result.append(line)
+
+    return "\n".join(result), heading_count
+
+
 def read_clipboard() -> str:
     """Read text from clipboard. Requires pyperclip."""
     try:
@@ -168,6 +191,8 @@ def main():
 
     feature_group = parser.add_argument_group("Features (enabled by default: fix-spaces)")
     feature_group.add_argument("--emoji", action="store_true", help="Remove emojis from text")
+    feature_group.add_argument("--hr", "--horizontal-rule", action="store_true",
+                               help="Insert --- before # headings with 1 blank-line gap")
     feature_group.add_argument("--no-fix-spaces", action="store_true", help="Disable trailing-space fix")
 
     args = parser.parse_args()
@@ -194,15 +219,20 @@ def main():
     result = text
     fixed_count = 0
     emoji_count = 0
+    hr_count = 0
     messages = []
+
+    if not args.no_fix_spaces:
+        result, fixed_count = fix_trailing_spaces(result)
+        messages.append(f"Fixed {fixed_count} line(s)")
 
     if args.emoji:
         result, emoji_count = remove_emojis(result)
         messages.append(f"Removed {emoji_count} emoji(s)")
 
-    if not args.no_fix_spaces:
-        result, fixed_count = fix_trailing_spaces(result)
-        messages.append(f"Fixed {fixed_count} line(s)")
+    if args.hr:
+        result, hr_count = add_horizontal_rule(result)
+        messages.append(f"Formatted {hr_count} heading(s) → ---")
 
     # Output
     summary = ". ".join(messages) if messages else "No changes made"

@@ -30,10 +30,14 @@ export default function ContactPage() {
                 Report issues or contribute at our GitHub repository. This is the best
                 way to report bugs or request features.
               </p>
-              {/* Update with your actual GitHub URL */}
-              <p className="mt-2 text-xs text-blue-600 dark:text-blue-400">
-                github.com/your-username/addfullstop
-              </p>
+              <a
+                href="https://github.com/fancyism/addfullstop"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 inline-block text-xs text-blue-600 hover:underline dark:text-blue-400"
+              >
+                github.com/fancyism/addfullstop
+              </a>
             </div>
             <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900">
               <h3 className="mb-1 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
