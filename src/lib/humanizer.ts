@@ -1,13 +1,13 @@
 /**
  * Humanizer — Rule-based text transformer that reduces AI patterns.
  *
- * Makes AI-generated text sound more natural by:
- * 1. Applying contractions ("do not" → "don't")
- * 2. Replacing AI clichés with natural alternatives
- * 3. Removing excessive hedging words
- * 4. Varying sentence structure (splitting long, combining short)
- * 5. Reducing passive voice patterns
- * 6. Adding sentence variety (burstiness)
+ * Targets ALL 6 metrics the analyzer measures:
+ * 1. AI Phrases — replace clichés, hedging, formal words
+ * 2. Sentence Variance — inject short punchy sentences between long ones
+ * 3. Burstiness — create alternating short/long rhythm
+ * 4. Vocabulary Richness — replace generic words with specific ones
+ * 5. Starter Repetition — rewrite repeated sentence beginnings
+ * 6. Paragraph Uniformity — vary paragraph sizes
  *
  * All client-side. No API calls.
  */
@@ -19,7 +19,7 @@ export interface HumanizeResult {
 }
 
 export interface HumanizeChange {
-  type: "contraction" | "cliché" | "hedging" | "sentence_split" | "passive" | "formal";
+  type: "contraction" | "cliché" | "hedging" | "sentence_split" | "passive" | "formal" | "burstiness" | "starter_fix" | "paragraph_fix" | "synonym";
   original: string;
   replacement: string;
   description: string;
@@ -104,6 +104,7 @@ const CLICHÉ_REPLACEMENTS: [RegExp, string][] = [
   [/\bIt is worth mentioning that\b/gi, ""],
   [/\bIt goes without saying that\b/gi, ""],
   [/\bNeedless to say,?\s*/gi, ""],
+  [/\bIt(?:'s| is) clear (?:that|to see)\b/gi, "Clearly,"],
 
   // Transitions
   [/\bFurthermore,?\s*/gi, "Also, "],
@@ -130,17 +131,30 @@ const CLICHÉ_REPLACEMENTS: [RegExp, string][] = [
   [/\bopens? doors?\b/gi, "creates opportunities"],
   [/\bsets? the stage for\b/gi, "prepares for"],
 
+  // "The key/importance/power of"
+  [/\bthe (?:key|importance|power|beauty|magic|genius) (?:of|behind|lies in)\b/gi, "what matters about"],
+
+  // "Not just... but"
+  [/\bIt(?:'s| is) not (?:just|only|merely)\b/gi, "It's more than"],
+
+  // "Think about / imagine this"
+  [/\b(?:think about|imagine|consider) (?:it|this|for a moment)[,.]?\s*/gi, ""],
+
+  // "At its core / at the end of the day"
+  [/\bAt (?:the end of|its core|its heart|the end of the day)[,.]?\s*/gi, ""],
+
   // Verbs
   [/\bleverage(?:s|d)?\b/gi, "use"],
   [/\butilize(?:s|d)?\b/gi, "use"],
   [/\bharness(?:es|ed)?\b/gi, "use"],
+  [/\bby (?:harnessing|leveraging|utilizing)\b/gi, "by using"],
+  [/\bthrough the use of\b/gi, "using"],
   [/\bimplement(?:s|ed)?\b/gi, "set up"],
   [/\bfacilitate(?:s|d)?\b/gi, "helps with"],
   [/\bendeavor(?:s|ed)?\b/gi, "try"],
   [/\bascertain(?:s|ed)?\b/gi, "find out"],
   [/\bcommence(?:s|d)?\b/gi, "start"],
   [/\bterminate(?:s|d)?\b/gi, "end"],
-  [/\bendeavor to\b/gi, "try to"],
   [/\bstrive to\b/gi, "try to"],
 
   // Adjectives
@@ -163,7 +177,7 @@ const CLICHÉ_REPLACEMENTS: [RegExp, string][] = [
   [/\bIn terms of\b/gi, "For"],
   [/\bWhen it comes to\b/gi, "For"],
 
-  // Sentence patterns — simplified (regex can't do back-references in replacements)
+  // Sentence patterns
   [/\bNot only\b/gi, ""],
   [/\bbut also\b/gi, "and"],
 
@@ -230,62 +244,18 @@ const FORMAL_CASUAL: [RegExp, string][] = [
   [/\bterminate\b/gi, "end"],
   [/\brender\b/gi, "make"],
   [/\bassist(?:ance)?\b/gi, "help"],
-  [/\brequire(?:s|d)?\b/gi, "need$1"],
-  [/\bpossess(?:es|ed)?\b/gi, "have$1"],
-  [/\bobtain(?:s|ed)?\b/gi, "get$1"],
-  [/\bconstruct(?:s|ed)?\b/gi, "build$1"],
-  [/\bmodify(?:s|ied)?\b/gi, "change$1"],
-  [/\bconsume(?:s|d)?\b/gi, "use$1"],
-  [/\bdemonstrate(?:s|d)?\b/gi, "show$1"],
-  [/\bindicate(?:s|d)?\b/gi, "show$1"],
+  [/\brequire(?:s|d)?\b/gi, "need"],
+  [/\bpossess(?:es|ed)?\b/gi, "have"],
+  [/\bobtain(?:s|ed)?\b/gi, "get"],
+  [/\bconstruct(?:s|ed)?\b/gi, "build"],
+  [/\bmodify(?:s|ied)?\b/gi, "change"],
+  [/\bconsume(?:s|d)?\b/gi, "use"],
+  [/\bdemonstrate(?:s|d)?\b/gi, "show"],
+  [/\bindicate(?:s|d)?\b/gi, "show"],
   [/\bensure(?:s|d)?\b/gi, "make sure"],
 ];
 
-// ─── Sentence splitting (burstiness) ──────────────────────────────────
-
-function splitLongSentences(text: string, changes: HumanizeChange[]): string {
-  const sentences = text.split(/(?<=[.!?])\s+/);
-  const result: string[] = [];
-
-  for (const sentence of sentences) {
-    const words = sentence.split(/\s+/);
-    if (words.length > 30) {
-      // Find a good split point — look for ", and", ", but", ", which", ", where"
-      const splitPatterns = [/, and /i, /, but /i, /, which /i, /, where /i, /, while /i, /, although /i, / — /, /; /];
-      let split = false;
-
-      for (const pattern of splitPatterns) {
-        const match = sentence.match(pattern);
-        if (match && match.index && match.index > 20) {
-          const idx = match.index;
-          const part1 = sentence.slice(0, idx).trim();
-          const part2 = sentence.slice(idx + match[0].length).trim();
-          // Only split if both parts are substantial
-          if (part1.split(/\s+/).length > 5 && part2.split(/\s+/).length > 5) {
-            const first = /[.!?]$/.test(part1) ? part1 : part1 + ".";
-            result.push(first.charAt(0).toUpperCase() + first.slice(1));
-            result.push(part2.charAt(0).toUpperCase() + part2);
-            changes.push({
-              type: "sentence_split",
-              original: sentence.slice(0, 80) + "...",
-              replacement: `${first.slice(0, 40)}... → ${part2.slice(0, 40)}...`,
-              description: "Split long sentence into two for better rhythm",
-            });
-            split = true;
-            break;
-          }
-        }
-      }
-      if (!split) result.push(sentence);
-    } else {
-      result.push(sentence);
-    }
-  }
-
-  return result.join(" ");
-}
-
-// ─── Passive voice detection & simplification ─────────────────────────
+// ─── Passive voice simplification ─────────────────────────────────────
 
 const PASSIVE_SIMPLIFY: [RegExp, string][] = [
   [/\bwas established by\b/gi, "started"],
@@ -306,7 +276,75 @@ const PASSIVE_SIMPLIFY: [RegExp, string][] = [
   [/\bshould be noted that\b/gi, "note that"],
 ];
 
-// ─── Main humanizer ───────────────────────────────────────────────────
+// ─── Synonym enrichment (for vocabulary richness) ─────────────────────
+
+const SYNONYM_REPLACEMENTS: [RegExp, string][] = [
+  [/\bvery good\b/gi, "excellent"],
+  [/\bvery bad\b/gi, "terrible"],
+  [/\bvery big\b/gi, "massive"],
+  [/\bvery small\b/gi, "tiny"],
+  [/\bvery important\b/gi, "critical"],
+  [/\bvery fast\b/gi, "rapid"],
+  [/\bvery slow\b/gi, "sluggish"],
+  [/\bvery old\b/gi, "ancient"],
+  [/\bvery new\b/gi, "brand-new"],
+  [/\bvery hard\b/gi, "grueling"],
+  [/\bvery easy\b/gi, "effortless"],
+  [/\bvery clear\b/gi, "obvious"],
+  [/\bvery different\b/gi, "distinct"],
+  [/\bvery similar\b/gi, "nearly identical"],
+  [/\ba lot of\b/gi, "tons of"],
+  [/\bmake sure\b/gi, "ensure"],
+  [/\blook at\b/gi, "examine"],
+  [/\bfind out\b/gi, "discover"],
+  [/\bcome up with\b/gi, "devise"],
+  [/\bgo up\b/gi, "rise"],
+  [/\bgo down\b/gi, "drop"],
+  [/\bget better\b/gi, "improve"],
+  [/\bget worse\b/gi, "deteriorate"],
+  [/\bkeep in mind\b/gi, "remember"],
+  [/\bput together\b/gi, "assemble"],
+  [/\bdeal with\b/gi, "tackle"],
+  [/\bcarry out\b/gi, "execute"],
+  [/\bbring about\b/gi, "cause"],
+  [/\bfigure out\b/gi, "determine"],
+  [/\bpoint out\b/gi, "highlight"],
+];
+
+// ─── Short punchy sentences for burstiness injection ───────────────────
+
+const FILLER_SENTENCES = [
+  "Right.",
+  "Think about it.",
+  "Simple as that.",
+  "Here's the thing.",
+  "Makes sense.",
+  "No joke.",
+  "Seriously.",
+  "That's the key.",
+  "And it shows.",
+  "It adds up.",
+  "Fair enough.",
+  "Exactly.",
+  "You can see why.",
+  "That matters.",
+  "It's that simple.",
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────
+
+function getSentences(text: string): string[] {
+  return text
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+function sentenceWordCount(s: string): number {
+  return s.split(/\s+/).filter(Boolean).length;
+}
+
+// ─── Apply replacements helper ────────────────────────────────────────
 
 function applyReplacements(
   text: string,
@@ -316,17 +354,17 @@ function applyReplacements(
 ): string {
   let result = text;
   for (const [pattern, replacement] of replacements) {
-    const matches = result.match(pattern);
-    if (matches) {
-      // Only record first occurrence to avoid spam
-      const sample = matches[0];
-      result = result.replace(pattern, replacement);
-      if (sample.length > 1 && sample.length < 80) {
+    const before = result;
+    result = result.replace(pattern, replacement);
+    if (result !== before) {
+      // Find what changed by re-running on the original
+      const match = before.match(pattern);
+      if (match && match[0].length > 1 && match[0].length < 80) {
         changes.push({
           type,
-          original: sample,
+          original: match[0],
           replacement,
-          description: `Replaced "${sample}" → "${replacement}"`,
+          description: `"${match[0]}" → "${replacement}"`,
         });
       }
     }
@@ -334,46 +372,253 @@ function applyReplacements(
   return result;
 }
 
-export function humanizeText(text: string): HumanizeResult {
-  const changes: HumanizeChange[] = [];
+// ─── Step 1: Word-level replacements ───────────────────────────────────
+
+function wordLevelPass(text: string, changes: HumanizeChange[]): string {
+  let result = text;
+  result = applyReplacements(result, CLICHÉ_REPLACEMENTS, changes, "cliché");
+  result = applyReplacements(result, CONTRACTIONS, changes, "contraction");
+  result = applyReplacements(result, HEDGE_REMOVALS, changes, "hedging");
+  result = applyReplacements(result, FORMAL_CASUAL, changes, "formal");
+  result = applyReplacements(result, PASSIVE_SIMPLIFY, changes, "passive");
+  result = applyReplacements(result, SYNONYM_REPLACEMENTS, changes, "synonym");
+  return result;
+}
+
+// ─── Step 2: Sentence-level restructuring (burstiness + variance) ──────
+
+function sentenceLevelPass(text: string, changes: HumanizeChange[]): string {
+  const sentences = getSentences(text);
+  if (sentences.length < 4) return text;
+
+  const result: string[] = [];
+  let fillerIdx = 0;
+
+  for (let i = 0; i < sentences.length; i++) {
+    const s = sentences[i];
+    const wc = sentenceWordCount(s);
+
+    // Split very long sentences (>30 words) at natural break points
+    if (wc > 30) {
+      const splitPatterns = [/,\s+and\s+/i, /,\s+but\s+/i, /,\s+which\s+/i, /,\s+while\s+/i, /\s+—\s+/, /;\s+/];
+      let didSplit = false;
+
+      for (const pat of splitPatterns) {
+        const m = s.match(pat);
+        if (m && m.index && m.index > 20 && m.index < s.length - 20) {
+          const part1 = s.slice(0, m.index).trim();
+          const part2 = s.slice(m.index + m[0].length).trim();
+          if (sentenceWordCount(part1) > 5 && sentenceWordCount(part2) > 5) {
+            const p1 = /[.!?]$/.test(part1) ? part1 : part1 + ".";
+            result.push(p1.charAt(0).toUpperCase() + p1.slice(1));
+            result.push(part2.charAt(0).toUpperCase() + part2);
+            changes.push({
+              type: "sentence_split",
+              original: s.slice(0, 60) + "...",
+              replacement: "Split into 2 shorter sentences",
+              description: "Broke a long sentence for better rhythm",
+            });
+            didSplit = true;
+            break;
+          }
+        }
+      }
+      if (!didSplit) result.push(s);
+
+      // Add a short filler after the split
+      if (didSplit && result.length > 0) {
+        const filler = FILLER_SENTENCES[fillerIdx % FILLER_SENTENCES.length];
+        fillerIdx++;
+        result.push(filler);
+        changes.push({
+          type: "burstiness",
+          original: "(long sentence block)",
+          replacement: filler,
+          description: "Added short sentence for rhythm variation",
+        });
+      }
+    } else {
+      result.push(s);
+
+      // Every 3-4 sentences of similar length, inject a short one for burstiness
+      if (i > 0 && i % 3 === 2 && wc > 10) {
+        const prev = sentences[i - 1];
+        if (prev && Math.abs(sentenceWordCount(prev) - wc) < 5) {
+          // Two consecutive similar-length sentences — inject contrast
+          const filler = FILLER_SENTENCES[fillerIdx % FILLER_SENTENCES.length];
+          fillerIdx++;
+          result.push(filler);
+          changes.push({
+            type: "burstiness",
+            original: "(uniform rhythm)",
+            replacement: filler,
+            description: "Added short sentence to break uniform rhythm",
+          });
+        }
+      }
+    }
+  }
+
+  return result.join(" ");
+}
+
+// ─── Step 3: Sentence starter variation ────────────────────────────────
+
+const STARTER_REWRITES: [RegExp, string][] = [
+  [/\bIt is (?:also|important|clear|worth|evident|necessary)\b/gi, "This is"],
+  [/\bThis is because\b/gi, "Because"],
+  [/\bThere are (?:many|several|various|numerous)\b/gi, "You'll find"],
+  [/\bThis (?:means|allows|enables|helps|ensures)\b/gi, "What this does is"],
+  [/\bWe can (?:see|observe|conclude|infer)\b/gi, "Looking at this, you"],
+  [/\bOne (?:of the|thing|reason|way|approach)\b/gi, "A key"],
+  [/\bThese (?:include|are|consist|involve)\b/gi, "Among them:"],
+];
+
+function starterVariationPass(text: string, changes: HumanizeChange[]): string {
+  const sentences = getSentences(text);
+  if (sentences.length < 5) return text;
+
+  // Detect repeated starters (first 2 words)
+  const starterCounts = new Map<string, number>();
+  for (const s of sentences) {
+    const words = s.trim().split(/\s+/);
+    const starter = words.length >= 2 ? (words[0] + " " + words[1]).toLowerCase() : (words[0] ?? "").toLowerCase();
+    starterCounts.set(starter, (starterCounts.get(starter) ?? 0) + 1);
+  }
+
+  // Find starters that repeat 2+ times
+  const repeatedStarters = [...starterCounts.entries()]
+    .filter(([, c]) => c >= 2)
+    .map(([s]) => s);
+
+  if (repeatedStarters.length === 0) return text;
+
   let result = text;
 
-  // Step 1: AI clichés (biggest impact on score)
-  result = applyReplacements(result, CLICHÉ_REPLACEMENTS, changes, "cliché");
+  // Apply starter rewrites only to repeated patterns
+  for (const [pattern, replacement] of STARTER_REWRITES) {
+    const matches = result.match(new RegExp(pattern.source, "gi"));
+    if (matches && matches.length >= 2) {
+      // Replace only the 2nd+ occurrence to keep some variety
+      let count = 0;
+      result = result.replace(new RegExp(pattern.source, "gi"), (match) => {
+        count++;
+        if (count >= 2) {
+          changes.push({
+            type: "starter_fix",
+            original: match,
+            replacement,
+            description: `Varied repeated starter "${match}" → "${replacement}"`,
+          });
+          return replacement;
+        }
+        return match;
+      });
+    }
+  }
 
-  // Step 2: Contractions (makes text feel more natural/conversational)
-  result = applyReplacements(result, CONTRACTIONS, changes, "contraction");
+  return result;
+}
 
-  // Step 3: Remove hedging (reduces "AI caution" patterns)
-  result = applyReplacements(result, HEDGE_REMOVALS, changes, "hedging");
+// ─── Step 4: Paragraph-level restructuring ─────────────────────────────
 
-  // Step 4: Formal → casual (reduces stiffness)
-  result = applyReplacements(result, FORMAL_CASUAL, changes, "formal");
+function paragraphLevelPass(text: string, changes: HumanizeChange[]): string {
+  const paragraphs = text.split(/\n\s*\n/).filter((p) => p.trim().length > 0);
+  if (paragraphs.length < 2) return text;
 
-  // Step 5: Passive voice simplification
-  result = applyReplacements(result, PASSIVE_SIMPLIFY, changes, "passive");
+  const lengths = paragraphs.map((p) => p.split(/\s+/).length);
+  const avgLen = lengths.reduce((a, b) => a + b, 0) / lengths.length;
 
-  // Step 6: Split long sentences (increases burstiness)
-  result = splitLongSentences(result, changes);
+  // Check if paragraphs are too uniform (all similar size)
+  const cv = standardDeviation(lengths) / avgLen;
+  if (cv > 0.3) return text; // Already varied enough
 
-  // Clean up artifacts
-  result = result
-    .replace(/\s{2,}/g, " ")      // double spaces
+  const result: string[] = [];
+
+  for (let i = 0; i < paragraphs.length; i++) {
+    const p = paragraphs[i];
+    const pLen = p.split(/\s+/).length;
+
+    // If a paragraph is much longer than average, split it
+    if (pLen > avgLen * 1.5 && pLen > 40) {
+      const sentences = getSentences(p);
+      if (sentences.length >= 4) {
+        // Take first 2 sentences as a short emphasis paragraph
+        const emphasis = sentences.slice(0, 2).join(" ");
+        const rest = sentences.slice(2).join(" ");
+        result.push(emphasis);
+        result.push(rest);
+        changes.push({
+          type: "paragraph_fix",
+          original: `1 paragraph (${pLen} words)`,
+          replacement: `Split into 2 (${sentenceWordCount(emphasis)} + ${sentenceWordCount(rest)} words)`,
+          description: "Split long paragraph for size variation",
+        });
+        continue;
+      }
+    }
+
+    result.push(p);
+  }
+
+  return result.join("\n\n");
+}
+
+function standardDeviation(arr: number[]): number {
+  if (arr.length < 2) return 0;
+  const m = arr.reduce((a, b) => a + b, 0) / arr.length;
+  return Math.sqrt(arr.reduce((sum, v) => sum + (v - m) ** 2, 0) / arr.length);
+}
+
+// ─── Cleanup ──────────────────────────────────────────────────────────
+
+function cleanup(text: string): string {
+  return text
+    .replace(/\s{2,}/g, " ")       // double spaces
     .replace(/\.\./g, ".")          // double periods
     .replace(/\.,/g, ",")           // period-comma
     .replace(/,\./g, ".")           // comma-period
     .replace(/\s+\./g, ".")         // space before period
     .replace(/\.\s*\./g, ".")       // consecutive periods
-    .replace(/^\s+/gm, "")          // leading spaces on lines
-    .replace(/\s+$/gm, "")          // trailing spaces on lines
+    .replace(/^\s+/gm, "")          // leading spaces
+    .replace(/\s+$/gm, "")          // trailing spaces
+    .replace(/^(?:Right|Think about it|Simple as that|Here's the thing|Makes sense|No joke|Seriously|That's the key|And it shows|It adds up|Fair enough|Exactly|You can see why|That matters|It's that simple)\.\s*(?:Right|Think about it|Simple as that|Here's the thing|Makes sense|No joke|Seriously|That's the key|And it shows|It adds up|Fair enough|Exactly|You can see why|That matters|It's that simple)\./gi, (match) => match.split(/\.\s*/)[0] + ".")
     .trim();
+}
 
-  // Cap changes for display
-  const displayChanges = changes.slice(0, 50);
+// ─── Main humanizer ───────────────────────────────────────────────────
+
+export function humanizeText(text: string): HumanizeResult {
+  const changes: HumanizeChange[] = [];
+  let result = text;
+
+  // Pass 1: Word-level (AI phrases, contractions, hedging, formal, passive, synonyms)
+  result = wordLevelPass(result, changes);
+
+  // Pass 2: Sentence-level (split long, inject short for burstiness)
+  result = sentenceLevelPass(result, changes);
+
+  // Pass 3: Starter variation (fix repeated beginnings)
+  result = starterVariationPass(result, changes);
+
+  // Pass 4: Paragraph-level (split uniform paragraphs)
+  result = paragraphLevelPass(result, changes);
+
+  // Cleanup artifacts
+  result = cleanup(result);
+
+  // Deduplicate similar changes
+  const seen = new Set<string>();
+  const uniqueChanges = changes.filter((c) => {
+    const key = `${c.type}:${c.original}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 
   return {
     text: result,
-    changes: displayChanges,
-    totalChanges: changes.length,
+    changes: uniqueChanges.slice(0, 50),
+    totalChanges: uniqueChanges.length,
   };
 }

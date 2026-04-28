@@ -109,6 +109,14 @@ function normalizeToScore(value: number, lowGood: number, highBad: number): numb
   return Math.round(((value - lowGood) / (highBad - lowGood)) * 100);
 }
 
+/**
+ * Inverse: high value = GOOD (human-like) → low AI score.
+ * Use for metrics where higher = more human (variance, richness, variety).
+ */
+function normalizeHighIsGood(value: number, lowBad: number, highGood: number): number {
+  return 100 - normalizeToScore(value, lowBad, highGood);
+}
+
 // ─── Metric 1: Sentence Length Variance ───────────────────────────────
 
 function analyzeSentenceVariance(sentences: string[]): MetricResult {
@@ -117,7 +125,8 @@ function analyzeSentenceVariance(sentences: string[]): MetricResult {
   }
   const lengths = sentences.map((s) => s.split(/\s+/).length);
   const cv = coefficientOfVariation(lengths);
-  const score = Math.min(100, Math.max(0, normalizeToScore(cv, 0.55, 0.2)));
+  // LOW cv = uniform = AI-like (high score). HIGH cv = varied = human-like (low score)
+  const score = Math.min(100, Math.max(0, normalizeHighIsGood(cv, 0.2, 0.55)));
   return {
     score,
     label: cv < 0.3 ? "Very uniform — typical of AI" : cv < 0.5 ? "Somewhat uniform" : "Varied — human-like",
@@ -135,7 +144,8 @@ function analyzeVocabularyRichness(words: string[]): MetricResult {
   const ttr = uniqueWords.size / words.length;
   const lengthAdjustment = Math.max(0, 1 - words.length / 2000);
   const adjustedTTR = ttr + lengthAdjustment * 0.1;
-  const score = Math.min(100, Math.max(0, normalizeToScore(adjustedTTR, 0.55, 0.35)));
+  // LOW TTR = repetitive = AI-like (high score). HIGH TTR = rich = human-like (low score)
+  const score = Math.min(100, Math.max(0, normalizeHighIsGood(adjustedTTR, 0.35, 0.55)));
   return {
     score,
     label: adjustedTTR < 0.4 ? "Low diversity — AI-like" : adjustedTTR < 0.5 ? "Moderate diversity" : "Rich vocabulary — human-like",
@@ -157,7 +167,8 @@ function analyzeBurstiness(sentences: string[]): MetricResult {
   const avgDiff = mean(diffs);
   const diffVariance = stdDev(diffs);
   const burstiness = avgDiff * (1 + diffVariance / 10);
-  const score = Math.min(100, Math.max(0, 100 - normalizeToScore(burstiness, 12, 4)));
+  // LOW burstiness = flat = AI-like (high score). HIGH burstiness = dynamic = human-like (low score)
+  const score = Math.min(100, Math.max(0, normalizeHighIsGood(burstiness, 4, 12)));
   return {
     score,
     label: burstiness < 5 ? "Flat rhythm — AI-like" : burstiness < 10 ? "Moderate rhythm" : "Dynamic rhythm — human-like",
@@ -200,7 +211,8 @@ function analyzeStarterRepetition(sentences: string[]): MetricResult {
   const maxRepeat = Math.max(...starterCounts.values());
   const uniqueStarters = starterCounts.size;
   const repetitionRatio = uniqueStarters / sentences.length;
-  const score = Math.min(100, Math.max(0, normalizeToScore(repetitionRatio, 0.65, 0.35)));
+  // LOW ratio = repetitive starters = AI-like (high score). HIGH ratio = varied = human-like (low score)
+  const score = Math.min(100, Math.max(0, normalizeHighIsGood(repetitionRatio, 0.35, 0.65)));
   const topRepeated = [...starterCounts.entries()]
     .filter(([, c]) => c > 1)
     .sort((a, b) => b[1] - a[1])
@@ -223,7 +235,8 @@ function analyzeParagraphUniformity(paragraphs: string[]): MetricResult {
   }
   const lengths = paragraphs.map((p) => p.split(/\s+/).length);
   const cv = coefficientOfVariation(lengths);
-  const score = Math.min(100, Math.max(0, normalizeToScore(cv, 0.4, 0.15)));
+  // LOW cv = uniform paragraphs = AI-like (high score). HIGH cv = varied = human-like (low score)
+  const score = Math.min(100, Math.max(0, normalizeHighIsGood(cv, 0.15, 0.4)));
   return {
     score,
     label: cv < 0.2 ? "Uniform paragraphs — AI-like" : cv < 0.4 ? "Somewhat uniform" : "Varied paragraphs — human-like",
