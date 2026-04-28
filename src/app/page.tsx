@@ -669,12 +669,16 @@ export default function Home() {
                 <div>
                   <h3 className="mb-3 text-sm font-bold text-zinc-900 dark:text-zinc-100">Score Breakdown</h3>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <MetricCard title="Sentence Variance" metric={analysisResult.metrics.sentenceVariance} delay="delay-100" />
-                    <MetricCard title="Vocabulary Richness" metric={analysisResult.metrics.vocabularyRichness} delay="delay-200" />
-                    <MetricCard title="Burstiness" metric={analysisResult.metrics.burstiness} delay="delay-300" />
-                    <MetricCard title="AI Phrases" metric={analysisResult.metrics.aiPhrases} delay="delay-400" />
-                    <MetricCard title="Starter Repetition" metric={analysisResult.metrics.starterRepetition} delay="delay-500" />
-                    <MetricCard title="Paragraph Uniformity" metric={analysisResult.metrics.paragraphUniformity} delay="delay-600" />
+                    <MetricCard title="Zipf Conformity" metric={analysisResult.metrics.zipfConformity} delay="delay-100" />
+                    <MetricCard title="AI Phrases" metric={analysisResult.metrics.aiPhrases} delay="delay-150" />
+                    <MetricCard title="Punctuation Entropy" metric={analysisResult.metrics.punctuationEntropy} delay="delay-200" />
+                    <MetricCard title="Sentence Variance" metric={analysisResult.metrics.sentenceVariance} delay="delay-250" />
+                    <MetricCard title="Sentence Skewness" metric={analysisResult.metrics.sentenceSkewness} delay="delay-300" />
+                    <MetricCard title="Starter Repetition" metric={analysisResult.metrics.starterRepetition} delay="delay-350" />
+                    <MetricCard title="Hapax Ratio" metric={analysisResult.metrics.hapaxRatio} delay="delay-400" />
+                    <MetricCard title="Paragraph Uniformity" metric={analysisResult.metrics.paragraphUniformity} delay="delay-450" />
+                    <MetricCard title="Vocabulary Richness" metric={analysisResult.metrics.vocabularyRichness} delay="delay-500" />
+                    <MetricCard title="Burstiness" metric={analysisResult.metrics.burstiness} delay="delay-550" />
                   </div>
                 </div>
 
