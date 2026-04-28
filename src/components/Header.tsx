@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export function Header() {
   return (
@@ -10,7 +11,7 @@ export function Header() {
         >
           AddFullStop<span className="text-blue-600 dark:text-blue-400">.</span>
         </Link>
-        <nav className="flex items-center gap-6">
+        <nav className="flex items-center gap-4">
           <Link
             href="/about"
             className="text-sm text-zinc-500 transition hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
@@ -19,16 +20,11 @@ export function Header() {
           </Link>
           <Link
             href="/privacy"
-            className="text-sm text-zinc-500 transition hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+            className="text-sm text-zinc-500 transition hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 hidden sm:block"
           >
             Privacy
           </Link>
-          <Link
-            href="/terms"
-            className="text-sm text-zinc-500 transition hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-          >
-            Terms
-          </Link>
+          <ThemeToggle />
         </nav>
       </div>
     </header>

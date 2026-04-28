@@ -5,18 +5,16 @@
   --foreground: #171717;
 }
 
+.dark {
+  --background: #09090b;
+  --foreground: #f4f4f5;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #09090b;
-    --foreground: #f4f4f5;
-  }
 }
 
 html {
@@ -100,16 +98,14 @@ body {
   background-color: oklch(0.97 0.05 25);
 }
 
-@media (prefers-color-scheme: dark) {
-  .line-highlight-low {
-    background-color: oklch(0.25 0.04 150);
-  }
-  .line-highlight-medium {
-    background-color: oklch(0.25 0.04 90);
-  }
-  .line-highlight-high {
-    background-color: oklch(0.25 0.04 25);
-  }
+.dark .line-highlight-low {
+  background-color: oklch(0.25 0.04 150);
+}
+.dark .line-highlight-medium {
+  background-color: oklch(0.25 0.04 90);
+}
+.dark .line-highlight-high {
+  background-color: oklch(0.25 0.04 25);
 }
 
 /* ─── Print / PDF Report ──────────────────────────────────────────── */
