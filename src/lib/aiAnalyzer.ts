@@ -10,10 +10,16 @@
  * No server calls. No API keys. Pure math + pattern matching.
  */
 
+export interface AnalysisWarning {
+  type: "too_short" | "too_long" | "code_detected" | "non_english" | "repeated_text" | "analysis_error";
+  message: string;
+}
+
 export interface AIScore {
   overall: number;
   label: string;
   color: "green" | "yellow" | "red";
+  warnings: AnalysisWarning[];
   metrics: {
     zipfConformity: MetricResult;
     aiPhrases: MetricResult;
@@ -794,14 +800,76 @@ function generateTips(
 
 // ─── Main Analyzer ────────────────────────────────────────────────────
 
+// ─── Edge-Case Detection ──────────────────────────────────────────────
+
+/** Detect if text looks like source code */
+function detectCode(text: string): boolean {
+  const codeSignals = [
+    /^(import |from |const |let |var |function |class |def |public |private |package )/m,
+    /[{};]{3,}/,
+    /^\s*(if|for|while|switch|try|catch)\s*\(/m,
+    /\b(?:function|=>|===|!==|&&|\|\||<<|>>)\b/,
+    /^\s*(\/\/|#|\/\*|<!--)/m,
+    /\b(?:console\.log|print\(|System\.out|printf)\b/,
+    /\b(?:return\s+\w+;|export\s+default|module\.exports)\b/,
+  ];
+  let hits = 0;
+  for (const pat of codeSignals) {
+    if (pat.test(text)) hits++;
+  }
+  return hits >= 3;
+}
+
+/** Detect if text is primarily non-Latin (Thai, Chinese, Japanese, Korean, Arabic, etc.) */
+function detectNonEnglish(text: string): { isNonEnglish: boolean; language?: string } {
+  const latinChars = (text.match(/[a-zA-Z]/g) || []).length;
+  const totalAlpha = (text.match(/[\p{L}]/gu) || []).length;
+  if (totalAlpha === 0) return { isNonEnglish: false };
+  const latinRatio = latinChars / totalAlpha;
+
+  // Thai
+  if ((text.match(/[\u0E00-\u0E7F]/g) || []).length > totalAlpha * 0.3) {
+    return { isNonEnglish: true, language: "Thai" };
+  }
+  // Chinese/Japanese
+  if ((text.match(/[\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF]/g) || []).length > totalAlpha * 0.3) {
+    return { isNonEnglish: true, language: "Chinese/Japanese" };
+  }
+  // Korean
+  if ((text.match(/[\uAC00-\uD7AF\u1100-\u11FF]/g) || []).length > totalAlpha * 0.3) {
+    return { isNonEnglish: true, language: "Korean" };
+  }
+  // Arabic
+  if ((text.match(/[\u0600-\u06FF]/g) || []).length > totalAlpha * 0.3) {
+    return { isNonEnglish: true, language: "Arabic" };
+  }
+  // General: less than 20% Latin = non-English
+  if (latinRatio < 0.2) {
+    return { isNonEnglish: true };
+  }
+  return { isNonEnglish: false };
+}
+
+/** Detect if text is heavily repeated (spam/gibberish) */
+function detectRepeatedText(text: string): boolean {
+  const lines = text.split(/\n/).filter((l) => l.trim().length > 0);
+  if (lines.length < 4) return false;
+  const unique = new Set(lines.map((l) => l.trim().toLowerCase()));
+  // If >70% of lines are duplicates, it's repeated
+  return unique.size / lines.length < 0.3;
+}
+
 export function analyzeText(text: string): AIScore {
   const trimmed = text.trim();
+  const warnings: AnalysisWarning[] = [];
 
+  // ─── Edge case: Empty / too short ───
   if (!trimmed || trimmed.length < 50) {
     return {
       overall: 0,
       label: "Too short",
       color: "green",
+      warnings: [{ type: "too_short", message: "Paste at least 50 characters (2-3 sentences) for reliable analysis." }],
       metrics: {
         zipfConformity: { score: 0, label: "Need more text", description: "Zipf's law conformity" },
         aiPhrases: { score: 0, label: "Need more text", description: "AI phrase patterns" },
@@ -820,14 +888,38 @@ export function analyzeText(text: string): AIScore {
     };
   }
 
-  const words = getWords(trimmed);
-  const sentences = getSentences(trimmed);
-  const paragraphs = getParagraphs(trimmed);
+  // ─── Edge case: Too long (100k+ chars) ───
+  let analysisText = trimmed;
+  if (trimmed.length > 100_000) {
+    analysisText = trimmed.slice(0, 100_000);
+    warnings.push({ type: "too_long", message: `Text is ${Math.round(trimmed.length / 1000)}k chars. Analyzing first 100k for performance.` });
+  }
+
+  // ─── Edge case: Code detection ───
+  if (detectCode(analysisText)) {
+    warnings.push({ type: "code_detected", message: "This looks like source code. AI analysis works best on prose/articles, not code." });
+  }
+
+  // ─── Edge case: Non-English text ───
+  const langCheck = detectNonEnglish(analysisText);
+  if (langCheck.isNonEnglish) {
+    const langNote = langCheck.language ? ` Detected: ${langCheck.language}.` : "";
+    warnings.push({ type: "non_english", message: `Metrics are optimized for English text.${langNote} Results may be less accurate.` });
+  }
+
+  // ─── Edge case: Repeated/gibberish text ───
+  if (detectRepeatedText(analysisText)) {
+    warnings.push({ type: "repeated_text", message: "Text appears heavily repeated. Analysis may not be meaningful." });
+  }
+
+  const words = getWords(analysisText);
+  const sentences = getSentences(analysisText);
+  const paragraphs = getParagraphs(analysisText);
 
   const metrics = {
     zipfConformity: analyzeZipfConformity(words),
-    aiPhrases: analyzeAIPhrases(trimmed, words.length),
-    punctuationEntropy: analyzePunctuationEntropy(trimmed),
+    aiPhrases: analyzeAIPhrases(analysisText, words.length),
+    punctuationEntropy: analyzePunctuationEntropy(analysisText),
     sentenceVariance: analyzeSentenceVariance(sentences),
     sentenceSkewness: analyzeSentenceSkewness(sentences),
     starterRepetition: analyzeStarterRepetition(sentences),
@@ -869,8 +961,8 @@ export function analyzeText(text: string): AIScore {
     color = "red";
   }
 
-  const lineScores = analyzeLineByLine(trimmed, sentences);
-  const tips = generateTips(trimmed, sentences, paragraphs, words, metrics, overall);
+  const lineScores = analyzeLineByLine(analysisText, sentences);
+  const tips = generateTips(analysisText, sentences, paragraphs, words, metrics, overall);
   const stats = {
     wordCount: words.length,
     sentenceCount: sentences.length,
@@ -879,5 +971,5 @@ export function analyzeText(text: string): AIScore {
     readingTimeMin: Math.max(1, Math.round(words.length / 238)),
   };
 
-  return { overall, label, color, metrics, lineScores, tips, stats };
+  return { overall, label, color, warnings, metrics, lineScores, tips, stats };
 }

@@ -11,6 +11,30 @@ import { formatForPlatform, PLATFORM_META } from "@/lib/platformFormatter";
 import type { Platform, PlatformFormatResult } from "@/lib/platformFormatter";
 import { AdBanner } from "@/components/AdBanner";
 
+// ─── Clipboard with fallback ──────────────────────────────────────────
+async function copyToClipboard(text: string): Promise<boolean> {
+  // Modern Clipboard API (requires HTTPS or localhost)
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // Fallback: hidden textarea + execCommand (works on HTTP)
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.cssText = "position:fixed;left:-9999px;top:-9999px;opacity:0";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
 type Tab = "fix" | "analyze";
 
 export default function Home() {
@@ -41,7 +65,9 @@ export default function Home() {
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null);
   const [platformResult, setPlatformResult] = useState<PlatformFormatResult | null>(null);
   const [platformCopied, setPlatformCopied] = useState(false);
+  const [analyzerError, setAnalyzerError] = useState<string | null>(null);
   const analyzerTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ─── Fix Text logic ───────────────────────────────────────────────
 
@@ -77,9 +103,8 @@ export default function Home() {
 
   const handleCopy = useCallback(async () => {
     if (!output) return;
-    await navigator.clipboard.writeText(output);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    const ok = await copyToClipboard(output);
+    if (ok) { setCopied(true); setTimeout(() => setCopied(false), 1500); }
   }, [output]);
 
   const handleDownload = useCallback(() => {
@@ -130,13 +155,27 @@ export default function Home() {
 
   const runAnalysis = useCallback((text: string) => {
     if (!text.trim()) return;
-    const result = analyzeText(text);
-    setAnalysisResult(result);
+    setAnalyzerError(null);
+    try {
+      const result = analyzeText(text);
+      setAnalysisResult(result);
+    } catch (err) {
+      setAnalyzerError("Analysis failed — something went wrong. Try shorter or different text.");
+      console.error("analyzeText error:", err);
+    }
   }, []);
 
   const handleAnalyzerInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setAnalyzerInput(e.target.value);
-  }, []);
+    // Debounce auto-analysis on typing (300ms)
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const val = e.target.value.trim();
+      if (val.length >= 50) {
+        runAnalysis(val);
+      }
+    }, 300);
+  }, [runAnalysis]);
 
   const handleAnalyzerPaste = useCallback(() => {
     requestAnimationFrame(() => {
@@ -146,31 +185,40 @@ export default function Home() {
   }, [runAnalysis]);
 
   const handleAnalyzeClick = useCallback(() => {
+    setAnalyzerError(null);
     runAnalysis(analyzerInput);
   }, [analyzerInput, runAnalysis]);
 
   const handleAnalyzerClear = useCallback(() => {
     setAnalyzerInput("");
     setAnalysisResult(null);
+    setAnalyzerError(null);
     setAnimatedScore(0);
     setHumanizeResult(null);
     setHumanizedScore(null);
     setAnimatedHumanizedScore(0);
     setSelectedPlatform(null);
     setPlatformResult(null);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
   }, []);
 
   // ─── Humanizer logic ─────────────────────────────────────────────
 
   const handleHumanize = useCallback(() => {
     if (!analyzerInput.trim()) return;
-    const result = humanizeText(analyzerInput);
-    setHumanizeResult(result);
-    const score = analyzeText(result.text);
-    setHumanizedScore(score);
-    // Reset platform when re-humanizing
-    setSelectedPlatform(null);
-    setPlatformResult(null);
+    setAnalyzerError(null);
+    try {
+      const result = humanizeText(analyzerInput);
+      setHumanizeResult(result);
+      const score = analyzeText(result.text);
+      setHumanizedScore(score);
+      // Reset platform when re-humanizing
+      setSelectedPlatform(null);
+      setPlatformResult(null);
+    } catch (err) {
+      setAnalyzerError("Humanization failed — try different text.");
+      console.error("humanizeText error:", err);
+    }
   }, [analyzerInput]);
 
   const handlePlatformSelect = useCallback((platform: Platform) => {
@@ -188,9 +236,8 @@ export default function Home() {
 
   const handleCopyPlatform = useCallback(async () => {
     if (!platformResult) return;
-    await navigator.clipboard.writeText(platformResult.text);
-    setPlatformCopied(true);
-    setTimeout(() => setPlatformCopied(false), 2000);
+    const ok = await copyToClipboard(platformResult.text);
+    if (ok) { setPlatformCopied(true); setTimeout(() => setPlatformCopied(false), 2000); }
   }, [platformResult]);
 
   // Animate original score
@@ -231,17 +278,15 @@ export default function Home() {
 
   const handleCopyHumanized = useCallback(async () => {
     if (!humanizeResult) return;
-    await navigator.clipboard.writeText(humanizeResult.text);
-    setAnalyzerCopied(true);
-    setTimeout(() => setAnalyzerCopied(false), 2000);
+    const ok = await copyToClipboard(humanizeResult.text);
+    if (ok) { setAnalyzerCopied(true); setTimeout(() => setAnalyzerCopied(false), 2000); }
   }, [humanizeResult]);
 
   const handleShareScore = useCallback(async () => {
     if (!analysisResult) return;
     const text = `I just tested my text on AddFullStop and got a ${analysisResult.overall}% AI score! 🔒 Try yours → addfullstop.vercel.app`;
-    await navigator.clipboard.writeText(text);
-    setAnalyzerCopied(true);
-    setTimeout(() => setAnalyzerCopied(false), 2000);
+    const ok = await copyToClipboard(text);
+    if (ok) { setAnalyzerCopied(true); setTimeout(() => setAnalyzerCopied(false), 2000); }
   }, [analysisResult]);
 
   // ─── Score ring SVG ───────────────────────────────────────────────
@@ -338,6 +383,7 @@ export default function Home() {
                 onPaste={handlePaste}
                 placeholder="Paste your ChatGPT text here, or upload a file..."
                 rows={8}
+                maxLength={100000}
                 className="w-full resize-y rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm leading-relaxed text-zinc-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-100 sm:rows-10"
               />
             </div>
@@ -427,8 +473,32 @@ export default function Home() {
                 onPaste={handleAnalyzerPaste}
                 placeholder="Paste any text to check if it sounds AI-generated..."
                 rows={6}
+                maxLength={100000}
                 className="w-full resize-y rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm leading-relaxed text-zinc-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-100"
               />
+              {/* Character counter */}
+              <div className="mt-1 flex items-center justify-between">
+                <span className={`text-[11px] ${
+                  analyzerInput.length === 0 ? "text-zinc-400"
+                    : analyzerInput.length < 50 ? "text-yellow-500"
+                    : analyzerInput.length > 50000 ? "text-red-500"
+                    : "text-zinc-400"
+                }`}>
+                  {analyzerInput.length === 0 ? ""
+                    : analyzerInput.length < 50 ? `⚠️ ${analyzerInput.length}/50 min chars`
+                    : `${analyzerInput.length.toLocaleString()} characters`}
+                  {analyzerInput.length > 50000 && " — very long text"}
+                </span>
+                {analyzerInput.length > 0 && analyzerInput.length < 50 && (
+                  <span className="text-[11px] text-yellow-500">Type or paste 50+ chars to analyze</span>
+                )}
+              </div>
+              {/* Error banner */}
+              {analyzerError && (
+                <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-400">
+                  ⚠️ {analyzerError}
+                </div>
+              )}
               <button
                 onClick={handleAnalyzeClick}
                 disabled={!analyzerInput.trim()}
@@ -444,6 +514,23 @@ export default function Home() {
             {/* Results */}
             {analysisResult && (
               <>
+                {/* Warnings banner */}
+                {analysisResult.warnings.length > 0 && (
+                  <div className="space-y-2">
+                    {analysisResult.warnings.map((w, i) => (
+                      <div key={i} className={`rounded-lg border px-4 py-2.5 text-sm ${
+                        w.type === "code_detected" ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-400"
+                        : w.type === "non_english" ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-400"
+                        : w.type === "repeated_text" ? "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-900 dark:bg-orange-950/30 dark:text-orange-400"
+                        : w.type === "too_long" ? "border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-900 dark:bg-yellow-950/30 dark:text-yellow-400"
+                        : "border-zinc-200 bg-zinc-50 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-400"
+                      }`}>
+                        {w.type === "code_detected" ? "🖥️" : w.type === "non_english" ? "🌐" : w.type === "repeated_text" ? "🔁" : w.type === "too_long" ? "📏" : "⚠️"} {w.message}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {/* Score Circle */}
                 <div className="animate-pulse-once rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm text-center dark:border-zinc-800 dark:bg-zinc-900">
                   <div className="relative mx-auto mb-4 h-48 w-48">
@@ -747,7 +834,7 @@ export default function Home() {
               },
               {
                 q: "How does the AI Analyzer work?",
-                a: "It uses 6 heuristic metrics to detect patterns typical of AI-generated text: sentence length variance, vocabulary richness, burstiness (rhythm), AI phrase detection, sentence starter repetition, and paragraph uniformity. All analysis runs in your browser — no data is sent anywhere.",
+                a: "It uses 10 heuristic metrics inspired by academic research to detect patterns typical of AI-generated text: Zipf's law conformity, AI phrase detection, punctuation entropy, sentence variance, sentence skewness, starter repetition, hapax ratio, paragraph uniformity, vocabulary richness, and burstiness. All analysis runs in your browser — no data is sent anywhere.",
               },
               {
                 q: "How accurate is the AI score?",
