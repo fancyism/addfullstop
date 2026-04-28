@@ -168,10 +168,15 @@ function analyzeBurstiness(sentences: string[]): MetricResult {
   const diffVariance = stdDev(diffs);
   const burstiness = avgDiff * (1 + diffVariance / 10);
   // LOW burstiness = flat = AI-like (high score). HIGH burstiness = dynamic = human-like (low score)
-  const score = Math.min(100, Math.max(0, normalizeHighIsGood(burstiness, 4, 12)));
+  const score = Math.min(100, Math.max(0, normalizeHighIsGood(burstiness, 2, 6)));
+  let label: string;
+  if (score < 25) label = "Dynamic rhythm — human-like";
+  else if (score < 50) label = "Good rhythm variation";
+  else if (score < 75) label = "Somewhat flat rhythm";
+  else label = "Flat rhythm — AI-like";
   return {
     score,
-    label: burstiness < 5 ? "Flat rhythm — AI-like" : burstiness < 10 ? "Moderate rhythm" : "Dynamic rhythm — human-like",
+    label,
     description: "Does the text alternate between short punchy and long complex sentences? AI is flat; humans are dynamic.",
   };
 }
@@ -187,11 +192,19 @@ function analyzeAIPhrases(text: string, wordCount: number): MetricResult {
     const matches = text.match(new RegExp(pattern.source, "gi"));
     if (matches) matchCount += matches.length;
   }
+  // Density = AI phrases per 1000 words
   const density = (matchCount / wordCount) * 1000;
-  const score = Math.min(100, Math.max(0, normalizeToScore(density, 1.5, 5)));
+  // Thresholds: 5/1000 = natural, 25/1000 = heavily AI
+  const score = Math.min(100, Math.max(0, normalizeToScore(density, 5, 25)));
+  // Labels consistent with score direction
+  let label: string;
+  if (matchCount === 0) label = "No AI clichés found";
+  else if (score < 30) label = `${matchCount} minor pattern${matchCount > 1 ? "s" : ""} — acceptable`;
+  else if (score < 60) label = `Found ${matchCount} AI-typical phrase${matchCount > 1 ? "s" : ""}`;
+  else label = `Heavy AI phrasing — ${matchCount} cliché${matchCount > 1 ? "s" : ""} detected`;
   return {
     score,
-    label: matchCount === 0 ? "No AI clichés found" : matchCount <= 2 ? "Few AI patterns" : `Found ${matchCount} AI-typical phrases`,
+    label,
     description: "Common ChatGPT phrases like 'In today's world', 'It's worth noting', 'Furthermore', etc.",
   };
 }
@@ -244,73 +257,180 @@ function analyzeParagraphUniformity(paragraphs: string[]): MetricResult {
   };
 }
 
-// ─── Per-line scoring ─────────────────────────────────────────────────
+// ─── Per-line scoring (specific reasons) ────────────────────────────────
 
 function analyzeLineByLine(text: string): LineScore[] {
   const lines = text.split("\n").filter((l) => l.trim().length > 0);
   return lines.map((line, i) => {
     let score = 0;
     const reasons: string[] = [];
-    const words = getWords(line);
-    const sentences = getSentences(line);
+    const lineWords = getWords(line);
+    const lineSentences = getSentences(line);
+    const wordCount = lineWords.length;
 
+    // Check each AI phrase pattern — name the exact one found
     for (const pattern of AI_PHRASES) {
-      if (pattern.test(line)) {
+      const match = line.match(new RegExp(pattern.source, "i"));
+      if (match) {
         score += 30;
-        reasons.push("AI phrase detected");
-        break;
+        reasons.push(`AI cliché: "${match[0]}"`);
+        break; // One AI phrase per line is enough
       }
     }
 
-    if (sentences.length >= 2) {
-      const lengths = sentences.map((s) => s.split(/\s+/).length);
+    // Sentence uniformity within this line
+    if (lineSentences.length >= 2) {
+      const lengths = lineSentences.map((s) => s.split(/\s+/).length);
       const cv = coefficientOfVariation(lengths);
       if (cv < 0.15) {
         score += 20;
-        reasons.push("Uniform sentence length");
+        reasons.push(`${lineSentences.length} sentences all ~${Math.round(mean(lengths))} words`);
       }
     }
 
-    if (/\b(?:therefore|thus|hence|wherein|accordingly|aforementioned)\b/i.test(line)) {
+    // Overly formal wording — name the word
+    const formalMatch = line.match(/\b(therefore|thus|hence|wherein|accordingly|aforementioned)\b/i);
+    if (formalMatch) {
       score += 15;
-      reasons.push("Overly formal wording");
+      reasons.push(`Formal: "${formalMatch[0]}"`);
     }
 
-    const hedgeCount = (line.match(/\b(?:may|might|could|can|perhaps|possibly|potentially|generally|typically|usually|often|tend to|seem to)\b/gi) ?? []).length;
-    if (hedgeCount >= 2) {
+    // Excessive hedging — count and name them
+    const hedgeWords = line.match(/\b(?:may|might|could|can|perhaps|possibly|potentially|generally|typically|usually|often|tend to|seem to)\b/gi);
+    if (hedgeWords && hedgeWords.length >= 2) {
       score += 15;
-      reasons.push("Excessive hedging");
+      const unique = [...new Set(hedgeWords.map((h) => h.toLowerCase()))];
+      reasons.push(`Hedging: ${unique.join(", ")} (${hedgeWords.length}x)`);
     }
 
-    if (words.length > 30 && !/[!?]/.test(line) && !/[—–…]/.test(line)) {
+    // Long formal sentence without emphasis
+    if (wordCount > 30 && !/[!?]/.test(line) && !/[—–…]/.test(line)) {
       score += 10;
-      reasons.push("Long formal sentence");
+      reasons.push(`${wordCount}-word sentence, no emphasis marks`);
+    }
+
+    // Very uniform line (same sentence structure)
+    if (lineSentences.length >= 3) {
+      const starters = lineSentences.map((s) => {
+        const w = s.trim().split(/\s+/);
+        return w[0]?.toLowerCase();
+      });
+      const firstWords = new Map<string, number>();
+      for (const s of starters) firstWords.set(s, (firstWords.get(s) ?? 0) + 1);
+      const maxStarter = Math.max(...firstWords.values());
+      if (maxStarter >= 3) {
+        score += 10;
+        const repeated = [...firstWords.entries()].find(([, c]) => c >= 3);
+        if (repeated) reasons.push(`Starts ${repeated[1]} sentences with "${repeated[0]}"`);
+      }
     }
 
     return {
       line: i + 1,
       text: line,
       score: Math.min(100, score),
-      reason: reasons.join(", ") || "Looks natural",
+      reason: reasons.length > 0 ? reasons.join(" · ") : "Looks natural",
     };
   });
 }
 
-// ─── Tips generator ───────────────────────────────────────────────────
+// ─── Tips generator (context-aware) ────────────────────────────────────
 
-function generateTips(metrics: AIScore["metrics"], overall: number): string[] {
+function generateTips(
+  text: string,
+  sentences: string[],
+  paragraphs: string[],
+  words: string[],
+  metrics: AIScore["metrics"],
+  overall: number,
+): string[] {
   const tips: string[] = [];
   if (overall < 30) {
-    tips.push("Your text looks naturally written! No major changes needed.");
+    tips.push("Your text reads naturally! No major AI patterns detected.");
     return tips;
   }
-  if (metrics.sentenceVariance.score > 60) tips.push("Vary your sentence lengths — mix short punchy sentences with longer ones.");
-  if (metrics.vocabularyRichness.score > 60) tips.push("Use more specific, unique words instead of common generic terms.");
-  if (metrics.burstiness.score > 60) tips.push("Add very short sentences (3-5 words) between long ones to create rhythm.");
-  if (metrics.aiPhrases.score > 60) tips.push("Replace AI clichés like 'In today's world' and 'It's worth noting' with your own voice.");
-  if (metrics.starterRepetition.score > 60) tips.push("Start sentences differently — don't repeat 'It is' or 'This is' multiple times.");
-  if (metrics.paragraphUniformity.score > 60) tips.push("Vary paragraph sizes — use 1-sentence paragraphs occasionally for emphasis.");
-  if (tips.length === 0 && overall >= 30) tips.push("Your text has some AI patterns. Try rewriting sections in your own voice.");
+
+  // Sentence variance — reference actual lengths
+  if (metrics.sentenceVariance.score > 50) {
+    const lengths = sentences.map((s) => s.split(/\s+/).length);
+    const avg = Math.round(mean(lengths));
+    const min = Math.min(...lengths);
+    const max = Math.max(...lengths);
+    tips.push(
+      `Your sentences are too uniform (avg ${avg} words, range ${min}–${max}). Mix in some 3–5 word punchy lines for rhythm.`,
+    );
+  }
+
+  // Vocabulary richness
+  if (metrics.vocabularyRichness.score > 50) {
+    const wordFreq = new Map<string, number>();
+    for (const w of words) wordFreq.set(w, (wordFreq.get(w) ?? 0) + 1);
+    const topRepeated = [...wordFreq.entries()]
+      .filter(([, c]) => c > 2)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([w, c]) => `"${w}" (${c}x)`);
+    if (topRepeated.length > 0) {
+      tips.push(`These words repeat a lot: ${topRepeated.join(", ")}. Try synonyms or rephrasing.`);
+    } else {
+      tips.push("Vocabulary feels repetitive. Swap some common words for more specific alternatives.");
+    }
+  }
+
+  // Burstiness
+  if (metrics.burstiness.score > 50) {
+    tips.push(
+      "The rhythm is flat — every sentence feels the same length. Break it up: after a long sentence, add a short one like \"Think about it.\" or \"Right.\"",
+    );
+  }
+
+  // AI phrases — name the actual phrases found
+  if (metrics.aiPhrases.score > 40) {
+    const foundPhrases: string[] = [];
+    for (const pattern of AI_PHRASES) {
+      const matches = text.match(new RegExp(pattern.source, "gi"));
+      if (matches) {
+        for (const m of matches) {
+          if (!foundPhrases.includes(m)) foundPhrases.push(m);
+        }
+      }
+    }
+    const display = foundPhrases.slice(0, 5);
+    const suffix = foundPhrases.length > 5 ? ` and ${foundPhrases.length - 5} more` : "";
+    tips.push(
+      `Replace these AI clichés: ${display.map((p) => `"${p}"`).join(", ")}${suffix}. Use your own voice instead.`,
+    );
+  }
+
+  // Starter repetition — name the repeated starters
+  if (metrics.starterRepetition.score > 50 && sentences.length >= 5) {
+    const starters = sentences.map((s) => {
+      const w = s.trim().split(/\s+/);
+      return w.length >= 2 ? (w[0] + " " + w[1]).toLowerCase() : (w[0] ?? "").toLowerCase();
+    });
+    const counts = new Map<string, number>();
+    for (const s of starters) counts.set(s, (counts.get(s) ?? 0) + 1);
+    const repeated = [...counts.entries()].filter(([, c]) => c > 1).sort((a, b) => b[1] - a[1]).slice(0, 3);
+    if (repeated.length > 0) {
+      const list = repeated.map(([s, c]) => `"${s}" (${c}x)`).join(", ");
+      tips.push(`These sentence starters repeat: ${list}. Vary your openings — start with a question, a fact, or a transition.`);
+    }
+  }
+
+  // Paragraph uniformity — reference actual sizes
+  if (metrics.paragraphUniformity.score > 50 && paragraphs.length >= 3) {
+    const pLens = paragraphs.map((p) => p.split(/\s+/).length);
+    const pAvg = Math.round(mean(pLens));
+    tips.push(
+      `All ${paragraphs.length} paragraphs are ~${pAvg} words — too similar. Make one paragraph just 1–2 sentences for emphasis.`,
+    );
+  }
+
+  // Fallback
+  if (tips.length === 0 && overall >= 30) {
+    tips.push("Some AI patterns detected. Try rewriting sections in your own voice for a more natural feel.");
+  }
+
   return tips;
 }
 
@@ -352,12 +472,12 @@ export function analyzeText(text: string): AIScore {
   };
 
   const weights: Record<string, number> = {
-    sentenceVariance: 0.2,
-    vocabularyRichness: 0.15,
-    burstiness: 0.25,
-    aiPhrases: 0.2,
+    sentenceVariance: 0.25,
+    vocabularyRichness: 0.1,
+    burstiness: 0.15,
+    aiPhrases: 0.25,
     starterRepetition: 0.1,
-    paragraphUniformity: 0.1,
+    paragraphUniformity: 0.15,
   };
 
   let overall = 0;
@@ -380,7 +500,7 @@ export function analyzeText(text: string): AIScore {
   }
 
   const lineScores = analyzeLineByLine(trimmed);
-  const tips = generateTips(metrics, overall);
+  const tips = generateTips(trimmed, sentences, paragraphs, words, metrics, overall);
   const stats = {
     wordCount: words.length,
     sentenceCount: sentences.length,
