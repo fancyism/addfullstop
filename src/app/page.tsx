@@ -5,6 +5,8 @@ import { processText } from "@/lib/processText";
 import type { ProcessOptions } from "@/lib/processText";
 import { analyzeText } from "@/lib/aiAnalyzer";
 import type { AIScore } from "@/lib/aiAnalyzer";
+import { humanizeText } from "@/lib/humanizer";
+import type { HumanizeResult } from "@/lib/humanizer";
 import { AdBanner } from "@/components/AdBanner";
 
 type Tab = "fix" | "analyze";
@@ -31,6 +33,9 @@ export default function Home() {
   const [analysisResult, setAnalysisResult] = useState<AIScore | null>(null);
   const [analyzerCopied, setAnalyzerCopied] = useState(false);
   const [animatedScore, setAnimatedScore] = useState(0);
+  const [humanizeResult, setHumanizeResult] = useState<HumanizeResult | null>(null);
+  const [humanizedScore, setHumanizedScore] = useState<AIScore | null>(null);
+  const [animatedHumanizedScore, setAnimatedHumanizedScore] = useState(0);
   const analyzerTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // ─── Fix Text logic ───────────────────────────────────────────────
@@ -143,9 +148,22 @@ export default function Home() {
     setAnalyzerInput("");
     setAnalysisResult(null);
     setAnimatedScore(0);
+    setHumanizeResult(null);
+    setHumanizedScore(null);
+    setAnimatedHumanizedScore(0);
   }, []);
 
-  // Animate score number counting up
+  // ─── Humanizer logic ─────────────────────────────────────────────
+
+  const handleHumanize = useCallback(() => {
+    if (!analyzerInput.trim()) return;
+    const result = humanizeText(analyzerInput);
+    setHumanizeResult(result);
+    const score = analyzeText(result.text);
+    setHumanizedScore(score);
+  }, [analyzerInput]);
+
+  // Animate original score
   useEffect(() => {
     if (!analysisResult || analysisResult.overall === animatedScore) return;
     const target = analysisResult.overall;
@@ -161,7 +179,32 @@ export default function Home() {
       });
     }, 20);
     return () => clearInterval(timer);
-  }, [analysisResult, animatedScore]);
+  }, [analysisResult]);
+
+  // Animate humanized score
+  useEffect(() => {
+    if (!humanizedScore || humanizedScore.overall === animatedHumanizedScore) return;
+    const target = humanizedScore.overall;
+    const step = target > animatedHumanizedScore ? Math.max(1, Math.ceil((target - animatedHumanizedScore) / 30)) : -Math.max(1, Math.ceil((animatedHumanizedScore - target) / 30));
+    const timer = setInterval(() => {
+      setAnimatedHumanizedScore((prev) => {
+        const next = prev + step;
+        if ((step > 0 && next >= target) || (step < 0 && next <= target)) {
+          clearInterval(timer);
+          return target;
+        }
+        return next;
+      });
+    }, 20);
+    return () => clearInterval(timer);
+  }, [humanizedScore]);
+
+  const handleCopyHumanized = useCallback(async () => {
+    if (!humanizeResult) return;
+    await navigator.clipboard.writeText(humanizeResult.text);
+    setAnalyzerCopied(true);
+    setTimeout(() => setAnalyzerCopied(false), 2000);
+  }, [humanizeResult]);
 
   const handleShareScore = useCallback(async () => {
     if (!analysisResult) return;
@@ -405,14 +448,115 @@ export default function Home() {
                     <span>Avg {analysisResult.stats.avgSentenceLength} words/sentence</span>
                   </div>
 
-                  {/* Share button */}
-                  <button
-                    onClick={handleShareScore}
-                    className="mt-4 rounded-lg border border-zinc-300 px-4 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                  >
-                    {analyzerCopied ? "✅ Copied!" : "📋 Share your score"}
-                  </button>
+                  {/* Share + Humanize buttons */}
+                  <div className="mt-4 flex flex-wrap justify-center gap-2">
+                    <button
+                      onClick={handleShareScore}
+                      className="rounded-lg border border-zinc-300 px-4 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    >
+                      {analyzerCopied ? "✅ Copied!" : "📋 Share your score"}
+                    </button>
+                    <button
+                      onClick={handleHumanize}
+                      className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                    >
+                      ✨ Humanize This Text
+                    </button>
+                  </div>
                 </div>
+
+                {/* ═══ Humanize Results ═══ */}
+                {humanizeResult && humanizedScore && (
+                  <>
+                    {/* Score comparison */}
+                    <div className="animate-fade-in-up rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-white p-6 shadow-sm dark:border-emerald-900 dark:from-emerald-950/30 dark:to-zinc-900">
+                      <h3 className="mb-4 text-center text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                        Before → After Humanization
+                      </h3>
+                      <div className="flex items-center justify-center gap-6">
+                        {/* Before score */}
+                        <div className="text-center">
+                          <div className="relative mx-auto h-24 w-24">
+                            <svg className="h-full w-full -rotate-90" viewBox="0 0 160 160">
+                              <circle cx="80" cy="80" r="70" fill="none" stroke="currentColor" strokeWidth="8" className="text-zinc-100 dark:text-zinc-800" />
+                              <circle cx="80" cy="80" r="70" fill="none" stroke={ringColor} strokeWidth="8" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={circumference - (animatedScore / 100) * circumference} />
+                            </svg>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                              <span className={`text-2xl font-black ${scoreColor === "green" ? "text-green-600" : scoreColor === "yellow" ? "text-yellow-600" : "text-red-600"}`}>{animatedScore}</span>
+                            </div>
+                          </div>
+                          <span className="mt-1 block text-xs font-medium text-zinc-500">Before</span>
+                        </div>
+
+                        <span className="text-2xl text-zinc-300 dark:text-zinc-600">→</span>
+
+                        {/* After score */}
+                        <div className="text-center">
+                          <div className="relative mx-auto h-24 w-24">
+                            <svg className="h-full w-full -rotate-90" viewBox="0 0 160 160">
+                              <circle cx="80" cy="80" r="70" fill="none" stroke="currentColor" strokeWidth="8" className="text-zinc-100 dark:text-zinc-800" />
+                              <circle cx="80" cy="80" r="70" fill="none" stroke="#22c55e" strokeWidth="8" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={circumference - (animatedHumanizedScore / 100) * circumference} className="animate-score-ring" />
+                            </svg>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                              <span className="text-2xl font-black text-green-600 dark:text-green-400">{animatedHumanizedScore}</span>
+                            </div>
+                          </div>
+                          <span className="mt-1 block text-xs font-medium text-zinc-500">After</span>
+                        </div>
+                      </div>
+
+                      {/* Improvement badge */}
+                      {analysisResult && humanizedScore.overall < analysisResult.overall && (
+                        <div className="mt-4 text-center">
+                          <span className="inline-block rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                            ↓ Reduced by {analysisResult.overall - humanizedScore.overall} points • {humanizeResult.totalChanges} changes made
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Humanized text output */}
+                    <div className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+                      <div className="mb-3 flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Humanized Text</h3>
+                        <button
+                          onClick={handleCopyHumanized}
+                          className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700"
+                        >
+                          {analyzerCopied ? "✅ Copied!" : "📋 Copy"}
+                        </button>
+                      </div>
+                      <div className="max-h-64 overflow-y-auto rounded-lg border border-zinc-100 bg-zinc-50 p-4 text-sm leading-relaxed text-zinc-800 dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-200">
+                        {humanizeResult.text}
+                      </div>
+                    </div>
+
+                    {/* Changes log */}
+                    {humanizeResult.changes.length > 0 && (
+                      <div className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+                        <details>
+                          <summary className="cursor-pointer text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                            🔄 Changes Made ({humanizeResult.totalChanges})
+                          </summary>
+                          <div className="mt-3 max-h-60 space-y-2 overflow-y-auto">
+                            {humanizeResult.changes.map((change, i) => (
+                              <div key={i} className="flex items-start gap-2 rounded-md bg-zinc-50 px-3 py-2 text-xs dark:bg-zinc-800/50">
+                                <span className="shrink-0 rounded bg-blue-100 px-1.5 py-0.5 font-mono text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                                  {change.type}
+                                </span>
+                                <div className="flex-1">
+                                  <span className="text-red-500 line-through">{change.original}</span>
+                                  <span className="mx-1 text-zinc-400">→</span>
+                                  <span className="text-green-600">{change.replacement}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      </div>
+                    )}
+                  </>
+                )}
 
                 {/* Metric Breakdown */}
                 <div>
@@ -485,6 +629,10 @@ export default function Home() {
               {
                 q: "Why does ChatGPT add trailing spaces?",
                 a: "ChatGPT and other AI models sometimes generate text with trailing whitespace at the end of lines. This can cause formatting issues when pasting into documents, code editors, or social media.",
+              },
+              {
+                q: "What does the Humanize feature do?",
+                a: "After analyzing your text, click \"Humanize This Text\" to automatically rewrite AI-sounding patterns. It adds contractions, replaces AI clichés with natural alternatives, removes hedging language, simplifies formal phrasing, and breaks long uniform sentences. All processing runs locally in your browser.",
               },
               {
                 q: "How does the AI Analyzer work?",
