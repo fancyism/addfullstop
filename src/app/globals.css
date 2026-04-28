@@ -33,3 +33,81 @@ body {
   background-color: #2563eb;
   color: white;
 }
+
+/* Score colors */
+:root {
+  --score-green: #22c55e;
+  --score-yellow: #eab308;
+  --score-red: #ef4444;
+}
+
+/* Score ring animation */
+@keyframes scoreRing {
+  from {
+    stroke-dashoffset: 440;
+  }
+}
+
+.animate-score-ring {
+  animation: scoreRing 1s ease-out forwards;
+}
+
+/* Score number count-up */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.4s ease-out forwards;
+  opacity: 0;
+}
+
+/* Stagger delays for metric cards */
+.delay-100 { animation-delay: 100ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-400 { animation-delay: 400ms; }
+.delay-500 { animation-delay: 500ms; }
+.delay-600 { animation-delay: 600ms; }
+
+/* Single pulse on score complete */
+@keyframes pulseOnce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+
+.animate-pulse-once {
+  animation: pulseOnce 0.5s ease-in-out 1s 1;
+}
+
+/* Line highlight backgrounds */
+.line-highlight-low {
+  background-color: oklch(0.95 0.05 150);
+}
+
+.line-highlight-medium {
+  background-color: oklch(0.97 0.05 90);
+}
+
+.line-highlight-high {
+  background-color: oklch(0.97 0.05 25);
+}
+
+@media (prefers-color-scheme: dark) {
+  .line-highlight-low {
+    background-color: oklch(0.25 0.04 150);
+  }
+  .line-highlight-medium {
+    background-color: oklch(0.25 0.04 90);
+  }
+  .line-highlight-high {
+    background-color: oklch(0.25 0.04 25);
+  }
+}
