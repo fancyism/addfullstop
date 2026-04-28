@@ -9,6 +9,8 @@ import { humanizeText } from "@/lib/humanizer";
 import type { HumanizeResult } from "@/lib/humanizer";
 import { formatForPlatform, PLATFORM_META } from "@/lib/platformFormatter";
 import type { Platform, PlatformFormatResult } from "@/lib/platformFormatter";
+import { analyzeReadability } from "@/lib/readabilityAnalyzer";
+import type { ReadabilityResult } from "@/lib/readabilityAnalyzer";
 import { AdBanner } from "@/components/AdBanner";
 
 // ─── Clipboard with fallback ──────────────────────────────────────────
@@ -35,7 +37,7 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-type Tab = "fix" | "analyze";
+type Tab = "fix" | "analyze" | "readability";
 
 export default function Home() {
   // Tab
@@ -68,6 +70,14 @@ export default function Home() {
   const [analyzerError, setAnalyzerError] = useState<string | null>(null);
   const analyzerTextareaRef = useRef<HTMLTextAreaElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Readability state
+  const [readabilityInput, setReadabilityInput] = useState("");
+  const [readabilityResult, setReadabilityResult] = useState<ReadabilityResult | null>(null);
+  const [readabilityError, setReadabilityError] = useState<string | null>(null);
+  const [readabilityCopied, setReadabilityCopied] = useState(false);
+  const readabilityTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const readabilityDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ─── Fix Text logic ───────────────────────────────────────────────
 
@@ -289,6 +299,50 @@ export default function Home() {
     if (ok) { setAnalyzerCopied(true); setTimeout(() => setAnalyzerCopied(false), 2000); }
   }, [analysisResult]);
 
+  // ─── Readability logic ────────────────────────────────────────────
+
+  const runReadabilityAnalysis = useCallback((text: string) => {
+    if (!text.trim()) return;
+    setReadabilityError(null);
+    try {
+      const result = analyzeReadability(text);
+      setReadabilityResult(result);
+    } catch (err) {
+      setReadabilityError("Readability analysis failed — try different text.");
+      console.error("analyzeReadability error:", err);
+    }
+  }, []);
+
+  const handleReadabilityInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setReadabilityInput(e.target.value);
+    if (readabilityDebounceRef.current) clearTimeout(readabilityDebounceRef.current);
+    readabilityDebounceRef.current = setTimeout(() => {
+      const val = e.target.value.trim();
+      if (val.length >= 50) runReadabilityAnalysis(val);
+    }, 300);
+  }, [runReadabilityAnalysis]);
+
+  const handleReadabilityPaste = useCallback(() => {
+    requestAnimationFrame(() => {
+      const pastedText = readabilityTextareaRef.current?.value ?? "";
+      if (pastedText.trim()) runReadabilityAnalysis(pastedText);
+    });
+  }, [runReadabilityAnalysis]);
+
+  const handleReadabilityClear = useCallback(() => {
+    setReadabilityInput("");
+    setReadabilityResult(null);
+    setReadabilityError(null);
+    if (readabilityDebounceRef.current) clearTimeout(readabilityDebounceRef.current);
+  }, []);
+
+  const handleCopyReadability = useCallback(async () => {
+    if (!readabilityResult) return;
+    const summary = `📊 Readability Report\nFlesch Score: ${readabilityResult.fleschScore}/100 (${readabilityResult.grade})\nReading Level: ${readabilityResult.readingLevel}\nTarget: ${readabilityResult.audience}\nWords: ${readabilityResult.stats.wordCount} | Sentences: ${readabilityResult.stats.sentenceCount} | Avg ${readabilityResult.stats.avgWordsPerSentence} words/sentence\nAnalyzed on AddFullStop`;
+    const ok = await copyToClipboard(summary);
+    if (ok) { setReadabilityCopied(true); setTimeout(() => setReadabilityCopied(false), 2000); }
+  }, [readabilityResult]);
+
   // ─── Score ring SVG ───────────────────────────────────────────────
 
   const scoreColor = analysisResult?.color ?? "green";
@@ -354,6 +408,16 @@ export default function Home() {
               }`}
             >
               🔍 AI Analyzer
+            </button>
+            <button
+              onClick={() => setActiveTab("readability")}
+              className={`rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
+                activeTab === "readability"
+                  ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-zinc-50"
+                  : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+              }`}
+            >
+              📊 Readability
             </button>
           </div>
         </div>
@@ -803,6 +867,200 @@ export default function Home() {
                           <span className={`shrink-0 text-[10px] font-medium ${ls.score >= 50 ? "text-red-500" : ls.score >= 20 ? "text-yellow-600" : "text-green-600"}`}>
                             {ls.score}%
                           </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ═══════════════ READABILITY TAB ═══════════════ */}
+        {activeTab === "readability" && (
+          <div className="space-y-6">
+            {/* Input */}
+            <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6 dark:border-zinc-800 dark:bg-zinc-900">
+              <div className="mb-2 flex items-center justify-between">
+                <label htmlFor="readability-input" className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  Paste your text
+                </label>
+                <button onClick={handleReadabilityClear} className="rounded-md border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800">
+                  Clear
+                </button>
+              </div>
+              <textarea
+                id="readability-input"
+                ref={readabilityTextareaRef}
+                value={readabilityInput}
+                onChange={handleReadabilityInputChange}
+                onPaste={handleReadabilityPaste}
+                placeholder="Paste any text to analyze readability, grade level, and reading difficulty..."
+                rows={6}
+                maxLength={100000}
+                className="w-full resize-y rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm leading-relaxed text-zinc-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-100"
+              />
+              <div className="mt-1 flex items-center justify-between">
+                <span className={`text-[11px] ${readabilityInput.length === 0 ? "text-zinc-400" : readabilityInput.length < 50 ? "text-yellow-500" : readabilityInput.length > 50000 ? "text-red-500" : "text-zinc-400"}`}>
+                  {readabilityInput.length === 0 ? "" : readabilityInput.length < 50 ? `⚠️ ${readabilityInput.length}/50 min chars` : `${readabilityInput.length.toLocaleString()} characters`}
+                </span>
+              </div>
+              {readabilityError && (
+                <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-400">
+                  ⚠️ {readabilityError}
+                </div>
+              )}
+              <p className="mt-2 text-center text-xs text-zinc-400 dark:text-zinc-500">
+                💡 Paste your text — auto-analyzes readability on paste!
+              </p>
+            </div>
+
+            {/* Results */}
+            {readabilityResult && (
+              <>
+                {/* Score Circle + Grade */}
+                <div className="animate-pulse-once rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm text-center dark:border-zinc-800 dark:bg-zinc-900">
+                  <div className="relative mx-auto mb-4 h-48 w-48">
+                    <svg className="h-full w-full -rotate-90" viewBox="0 0 160 160">
+                      <circle cx="80" cy="80" r="70" fill="none" stroke="currentColor" strokeWidth="8" className="text-zinc-100 dark:text-zinc-800" />
+                      <circle
+                        cx="80" cy="80" r="70" fill="none"
+                        stroke={readabilityResult.gradeColor === "green" ? "#22c55e" : readabilityResult.gradeColor === "yellow" ? "#eab308" : readabilityResult.gradeColor === "orange" ? "#f97316" : "#ef4444"}
+                        strokeWidth="8"
+                        strokeLinecap="round"
+                        strokeDasharray={2 * Math.PI * 70}
+                        strokeDashoffset={2 * Math.PI * 70 - (Math.max(0, readabilityResult.fleschScore) / 100) * 2 * Math.PI * 70}
+                        className="animate-score-ring"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className={`text-3xl font-black ${readabilityResult.gradeColor === "green" ? "text-green-600 dark:text-green-400" : readabilityResult.gradeColor === "yellow" ? "text-yellow-600 dark:text-yellow-400" : readabilityResult.gradeColor === "orange" ? "text-orange-600 dark:text-orange-400" : "text-red-600 dark:text-red-400"}`}>
+                        {readabilityResult.grade}
+                      </span>
+                      <span className="text-lg font-bold text-zinc-700 dark:text-zinc-300">{readabilityResult.fleschScore}</span>
+                      <span className="text-[10px] font-medium text-zinc-400">Flesch Score</span>
+                    </div>
+                  </div>
+                  <p className={`text-lg font-bold ${readabilityResult.gradeColor === "green" ? "text-green-700 dark:text-green-400" : readabilityResult.gradeColor === "yellow" ? "text-yellow-700 dark:text-yellow-400" : readabilityResult.gradeColor === "orange" ? "text-orange-700 dark:text-orange-400" : "text-red-700 dark:text-red-400"}`}>
+                    {readabilityResult.readingLevel}
+                  </p>
+                  <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                    🎯 {readabilityResult.audience}
+                  </p>
+
+                  {/* Stats bar */}
+                  <div className="mt-4 flex flex-wrap justify-center gap-4 text-xs text-zinc-500 dark:text-zinc-400">
+                    <span>{readabilityResult.stats.wordCount} words</span>
+                    <span>{readabilityResult.stats.sentenceCount} sentences</span>
+                    <span>Avg {readabilityResult.stats.avgWordsPerSentence} words/sentence</span>
+                    <span>{readabilityResult.stats.readingTimeMin} min read</span>
+                    <span>{readabilityResult.stats.speakingTimeMin} min speak</span>
+                  </div>
+
+                  {/* Share button */}
+                  <div className="mt-4 flex justify-center">
+                    <button
+                      onClick={handleCopyReadability}
+                      className="rounded-lg border border-zinc-300 px-4 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    >
+                      {readabilityCopied ? "✅ Copied!" : "📋 Share Readability Report"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Content Quality Stats */}
+                <div className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+                  <h3 className="mb-3 text-sm font-bold text-zinc-900 dark:text-zinc-100">Content Quality</h3>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div className="rounded-lg bg-zinc-50 p-3 text-center dark:bg-zinc-800/50">
+                      <span className="block text-lg font-bold text-zinc-900 dark:text-zinc-100">{readabilityResult.stats.avgSyllablesPerWord}</span>
+                      <span className="text-[10px] text-zinc-500">Syllables/Word</span>
+                    </div>
+                    <div className="rounded-lg bg-zinc-50 p-3 text-center dark:bg-zinc-800/50">
+                      <span className="block text-lg font-bold text-zinc-900 dark:text-zinc-100">{readabilityResult.stats.avgWordLength}</span>
+                      <span className="text-[10px] text-zinc-500">Avg Word Length</span>
+                    </div>
+                    <div className={`rounded-lg p-3 text-center ${readabilityResult.stats.complexWordRatio > 0.15 ? "bg-orange-50 dark:bg-orange-950/20" : "bg-zinc-50 dark:bg-zinc-800/50"}`}>
+                      <span className="block text-lg font-bold text-zinc-900 dark:text-zinc-100">{Math.round(readabilityResult.stats.complexWordRatio * 100)}%</span>
+                      <span className="text-[10px] text-zinc-500">Complex Words</span>
+                    </div>
+                    <div className={`rounded-lg p-3 text-center ${readabilityResult.stats.longSentenceRatio > 0.3 ? "bg-orange-50 dark:bg-orange-950/20" : "bg-zinc-50 dark:bg-zinc-800/50"}`}>
+                      <span className="block text-lg font-bold text-zinc-900 dark:text-zinc-100">{readabilityResult.stats.longSentenceCount}</span>
+                      <span className="text-[10px] text-zinc-500">Long Sentences (25+)</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Grade Level Metrics */}
+                <div>
+                  <h3 className="mb-3 text-sm font-bold text-zinc-900 dark:text-zinc-100">Grade Level Breakdown</h3>
+                  <div className="space-y-2">
+                    {Object.entries(readabilityResult.metrics).map(([key, metric]) => (
+                      <div key={key} className="flex items-center gap-3 rounded-lg border border-zinc-100 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
+                        <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-bold ${
+                          metric.value <= 6 ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                          : metric.value <= 10 ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                          : metric.value <= 13 ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
+                          : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                        }`}>
+                          {metric.label}
+                        </span>
+                        <span className="flex-1 text-xs text-zinc-500 dark:text-zinc-400">{metric.description}</span>
+                        <span className={`text-xs font-medium ${
+                          metric.value <= 6 ? "text-green-600 dark:text-green-400"
+                          : metric.value <= 10 ? "text-yellow-600 dark:text-yellow-400"
+                          : metric.value <= 13 ? "text-orange-600 dark:text-orange-400"
+                          : "text-red-600 dark:text-red-400"
+                        }`}>
+                          {metric.grade}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Tips */}
+                {readabilityResult.tips.length > 0 && (
+                  <div className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+                    <h3 className="mb-3 text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                      {readabilityResult.fleschScore >= 60 ? "✅ Looking Good" : "💡 Tips to Improve Readability"}
+                    </h3>
+                    <ul className="space-y-2">
+                      {readabilityResult.tips.map((tip, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+                          <span className="mt-0.5 shrink-0">{readabilityResult.fleschScore >= 60 ? "👍" : "→"}</span>
+                          <span>{tip}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Sentence Analysis */}
+                {readabilityResult.sentenceAnalysis.length > 0 && (
+                  <div className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+                    <h3 className="mb-3 text-sm font-bold text-zinc-900 dark:text-zinc-100">Sentence Analysis</h3>
+                    <div className="max-h-80 space-y-1 overflow-y-auto">
+                      {readabilityResult.sentenceAnalysis.map((sa) => (
+                        <div
+                          key={sa.index}
+                          className={`flex items-start gap-2 rounded-md px-3 py-2 text-xs ${
+                            sa.isLong ? "bg-orange-50 dark:bg-orange-950/20" : "bg-zinc-50 dark:bg-zinc-800/50"
+                          }`}
+                        >
+                          <span className="shrink-0 font-mono text-zinc-400 dark:text-zinc-500">{sa.index}.</span>
+                          <span className="flex-1 text-zinc-700 dark:text-zinc-300">{sa.text}</span>
+                          <div className="shrink-0 flex items-center gap-1.5">
+                            <span className={`text-[10px] font-medium ${sa.isLong ? "text-orange-600 dark:text-orange-400" : "text-zinc-400"}`}>
+                              {sa.wordCount}w
+                            </span>
+                            {sa.complexWords.length > 0 && (
+                              <span className="rounded bg-yellow-100 px-1 py-0.5 text-[9px] font-medium text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" title={`Complex: ${sa.complexWords.join(", ")}`}>
+                                {sa.complexWords.length}⚡
+                              </span>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
