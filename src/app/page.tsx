@@ -7,6 +7,8 @@ import { analyzeText } from "@/lib/aiAnalyzer";
 import type { AIScore } from "@/lib/aiAnalyzer";
 import { humanizeText } from "@/lib/humanizer";
 import type { HumanizeResult } from "@/lib/humanizer";
+import { formatForPlatform, PLATFORM_META } from "@/lib/platformFormatter";
+import type { Platform, PlatformFormatResult } from "@/lib/platformFormatter";
 import { AdBanner } from "@/components/AdBanner";
 
 type Tab = "fix" | "analyze";
@@ -36,6 +38,9 @@ export default function Home() {
   const [humanizeResult, setHumanizeResult] = useState<HumanizeResult | null>(null);
   const [humanizedScore, setHumanizedScore] = useState<AIScore | null>(null);
   const [animatedHumanizedScore, setAnimatedHumanizedScore] = useState(0);
+  const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null);
+  const [platformResult, setPlatformResult] = useState<PlatformFormatResult | null>(null);
+  const [platformCopied, setPlatformCopied] = useState(false);
   const analyzerTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // ─── Fix Text logic ───────────────────────────────────────────────
@@ -151,6 +156,8 @@ export default function Home() {
     setHumanizeResult(null);
     setHumanizedScore(null);
     setAnimatedHumanizedScore(0);
+    setSelectedPlatform(null);
+    setPlatformResult(null);
   }, []);
 
   // ─── Humanizer logic ─────────────────────────────────────────────
@@ -161,7 +168,30 @@ export default function Home() {
     setHumanizeResult(result);
     const score = analyzeText(result.text);
     setHumanizedScore(score);
+    // Reset platform when re-humanizing
+    setSelectedPlatform(null);
+    setPlatformResult(null);
   }, [analyzerInput]);
+
+  const handlePlatformSelect = useCallback((platform: Platform) => {
+    if (!humanizeResult) return;
+    // Toggle off if same platform
+    if (selectedPlatform === platform) {
+      setSelectedPlatform(null);
+      setPlatformResult(null);
+      return;
+    }
+    setSelectedPlatform(platform);
+    const result = formatForPlatform(humanizeResult.text, platform);
+    setPlatformResult(result);
+  }, [humanizeResult, selectedPlatform]);
+
+  const handleCopyPlatform = useCallback(async () => {
+    if (!platformResult) return;
+    await navigator.clipboard.writeText(platformResult.text);
+    setPlatformCopied(true);
+    setTimeout(() => setPlatformCopied(false), 2000);
+  }, [platformResult]);
 
   // Animate original score
   useEffect(() => {
@@ -553,6 +583,83 @@ export default function Home() {
                             ))}
                           </div>
                         </details>
+                      </div>
+                    )}
+
+                    {/* ═══ Platform Formatter ═══ */}
+                    <div className="rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-white p-5 dark:border-violet-900 dark:from-violet-950/20 dark:to-zinc-900">
+                      <h3 className="mb-3 text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                        📱 Format for Platform
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {(Object.keys(PLATFORM_META) as Platform[]).map((p) => {
+                          const meta = PLATFORM_META[p];
+                          const isActive = selectedPlatform === p;
+                          return (
+                            <button
+                              key={p}
+                              onClick={() => handlePlatformSelect(p)}
+                              className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                                isActive
+                                  ? "border-violet-500 bg-violet-600 text-white shadow-sm"
+                                  : "border-zinc-200 bg-white text-zinc-700 hover:border-violet-300 hover:bg-violet-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-violet-700 dark:hover:bg-violet-900/30"
+                              }`}
+                            >
+                              {meta.icon} {meta.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Platform formatted output */}
+                    {platformResult && (
+                      <div className="animate-fade-in-up rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+                        <div className="mb-3 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                              {PLATFORM_META[platformResult.platform].icon} {PLATFORM_META[platformResult.platform].label} Format
+                            </h3>
+                            {platformResult.charLimit && (
+                              <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                platformResult.isOverLimit
+                                  ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                                  : platformResult.charCount > platformResult.charLimit * 0.9
+                                    ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                                    : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                              }`}>
+                                {platformResult.charCount}{platformResult.charLimit ? `/${platformResult.charLimit}` : ""} chars
+                              </span>
+                            )}
+                            {!platformResult.charLimit && (
+                              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                                {platformResult.charCount} chars
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            onClick={handleCopyPlatform}
+                            className="rounded-md bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-violet-700"
+                          >
+                            {platformCopied ? "✅ Copied!" : "📋 Copy"}
+                          </button>
+                        </div>
+
+                        {/* Formatted text preview */}
+                        <div className="max-h-72 overflow-y-auto rounded-lg border border-zinc-100 bg-zinc-50 p-4 text-sm leading-relaxed text-zinc-800 whitespace-pre-wrap dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-200">
+                          {platformResult.text}
+                        </div>
+
+                        {/* Platform tips */}
+                        {platformResult.tips.length > 0 && (
+                          <div className="mt-3 space-y-1">
+                            {platformResult.tips.map((tip, i) => (
+                              <p key={i} className="text-xs text-zinc-500 dark:text-zinc-400">
+                                💡 {tip}
+                              </p>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </>
