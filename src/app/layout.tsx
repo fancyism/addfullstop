@@ -76,7 +76,7 @@ export default function RootLayout({
         {/* Google AdSense — replace ca-pub-XXXXXXX with your publisher ID when ready */}
         {/* <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXX" crossOrigin="anonymous" /> */}
       </head>
-      <body className="flex min-h-screen flex-col bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
+      <body className="flex min-h-screen flex-col text-[var(--text-primary)]">
         <Header />
         <main className="flex-1">{children}</main>
         <Footer />

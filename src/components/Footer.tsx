@@ -2,34 +2,38 @@ import Link from "next/link";
 
 export function Footer() {
   return (
-    <footer className="border-t border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+    <footer className="glass mt-auto border-t border-white/20 dark:border-white/5">
       <div className="mx-auto max-w-4xl px-4 py-8">
         <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
-          <div className="text-sm text-zinc-500 dark:text-zinc-400">
+          <div className="text-sm" style={{ color: "var(--text-muted)" }}>
             © {new Date().getFullYear()} AddFullStop. Free to use.
           </div>
           <nav className="flex gap-6">
             <Link
               href="/about"
-              className="text-sm text-zinc-400 transition hover:text-zinc-600 dark:hover:text-zinc-300"
+              className="text-sm transition hover:opacity-70"
+              style={{ color: "var(--text-muted)" }}
             >
               About
             </Link>
             <Link
               href="/privacy"
-              className="text-sm text-zinc-400 transition hover:text-zinc-600 dark:hover:text-zinc-300"
+              className="text-sm transition hover:opacity-70"
+              style={{ color: "var(--text-muted)" }}
             >
               Privacy Policy
             </Link>
             <Link
               href="/terms"
-              className="text-sm text-zinc-400 transition hover:text-zinc-600 dark:hover:text-zinc-300"
+              className="text-sm transition hover:opacity-70"
+              style={{ color: "var(--text-muted)" }}
             >
-              Terms of Service
+              Terms
             </Link>
             <Link
               href="/contact"
-              className="text-sm text-zinc-400 transition hover:text-zinc-600 dark:hover:text-zinc-300"
+              className="text-sm transition hover:opacity-70"
+              style={{ color: "var(--text-muted)" }}
             >
               Contact
             </Link>

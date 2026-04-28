@@ -1,13 +1,52 @@
 @import "tailwindcss";
 
+/* ─── CRITICAL: Tailwind v4 class-based dark mode ──────────────────── */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ─── 2026 Glassmorphism Color Palette ─────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f0f0f8;
+  --foreground: #1a1a2e;
+
+  /* Glassmorphism surfaces */
+  --glass-bg: rgba(255, 255, 255, 0.55);
+  --glass-border: rgba(255, 255, 255, 0.35);
+  --glass-shadow: rgba(100, 100, 180, 0.08);
+
+  /* Accent — soft violet-to-blue gradient */
+  --accent-from: #8b5cf6;
+  --accent-to: #6366f1;
+
+  /* Text hierarchy */
+  --text-primary: #1a1a2e;
+  --text-secondary: #4b5563;
+  --text-muted: #9ca3af;
+
+  /* Surface for inputs */
+  --surface: rgba(255, 255, 255, 0.6);
+  --surface-hover: rgba(255, 255, 255, 0.8);
+
+  /* Score colors */
+  --score-green: #22c55e;
+  --score-yellow: #eab308;
+  --score-red: #ef4444;
+  --score-orange: #f97316;
 }
 
 .dark {
-  --background: #09090b;
-  --foreground: #f4f4f5;
+  --background: #0f0f1a;
+  --foreground: #e8e8f0;
+
+  --glass-bg: rgba(30, 30, 50, 0.6);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-shadow: rgba(0, 0, 0, 0.3);
+
+  --text-primary: #e8e8f0;
+  --text-secondary: #a1a1b5;
+  --text-muted: #6b7280;
+
+  --surface: rgba(255, 255, 255, 0.05);
+  --surface-hover: rgba(255, 255, 255, 0.1);
 }
 
 @theme inline {
@@ -24,22 +63,52 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
+  min-height: 100vh;
 }
 
-/* Selection */
+/* ─── Gradient background ──────────────────────────────────────────── */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 10%, rgba(139, 92, 246, 0.12), transparent),
+    radial-gradient(ellipse 60% 50% at 80% 80%, rgba(99, 102, 241, 0.10), transparent),
+    radial-gradient(ellipse 50% 40% at 50% 50%, rgba(168, 85, 247, 0.06), transparent);
+  pointer-events: none;
+}
+
+.dark body::before {
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 10%, rgba(139, 92, 246, 0.15), transparent),
+    radial-gradient(ellipse 60% 50% at 80% 80%, rgba(99, 102, 241, 0.12), transparent),
+    radial-gradient(ellipse 50% 40% at 50% 50%, rgba(168, 85, 247, 0.08), transparent);
+}
+
+/* ─── Glass card ───────────────────────────────────────────────────── */
+.glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 8px 32px var(--glass-shadow);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.glass-subtle {
+  background: var(--surface);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* ─── Selection ────────────────────────────────────────────────────── */
 ::selection {
-  background-color: #2563eb;
-  color: white;
+  background-color: rgba(139, 92, 246, 0.3);
+  color: inherit;
 }
 
-/* Score colors */
-:root {
-  --score-green: #22c55e;
-  --score-yellow: #eab308;
-  --score-red: #ef4444;
-}
-
-/* Score ring animation */
+/* ─── Score ring animation ─────────────────────────────────────────── */
 @keyframes scoreRing {
   from {
     stroke-dashoffset: 440;
@@ -50,7 +119,7 @@ body {
   animation: scoreRing 1s ease-out forwards;
 }
 
-/* Score number count-up */
+/* ─── Fade in up ───────────────────────────────────────────────────── */
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -67,15 +136,20 @@ body {
   opacity: 0;
 }
 
-/* Stagger delays for metric cards */
+/* Stagger delays */
 .delay-100 { animation-delay: 100ms; }
+.delay-150 { animation-delay: 150ms; }
 .delay-200 { animation-delay: 200ms; }
+.delay-250 { animation-delay: 250ms; }
 .delay-300 { animation-delay: 300ms; }
+.delay-350 { animation-delay: 350ms; }
 .delay-400 { animation-delay: 400ms; }
+.delay-450 { animation-delay: 450ms; }
 .delay-500 { animation-delay: 500ms; }
+.delay-550 { animation-delay: 550ms; }
 .delay-600 { animation-delay: 600ms; }
 
-/* Single pulse on score complete */
+/* ─── Pulse once ───────────────────────────────────────────────────── */
 @keyframes pulseOnce {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.04); }
@@ -85,32 +159,29 @@ body {
   animation: pulseOnce 0.5s ease-in-out 1s 1;
 }
 
-/* Line highlight backgrounds */
+/* ─── Line highlight backgrounds ───────────────────────────────────── */
 .line-highlight-low {
-  background-color: oklch(0.95 0.05 150);
+  background-color: rgba(34, 197, 94, 0.08);
 }
-
 .line-highlight-medium {
-  background-color: oklch(0.97 0.05 90);
+  background-color: rgba(234, 179, 8, 0.08);
 }
-
 .line-highlight-high {
-  background-color: oklch(0.97 0.05 25);
+  background-color: rgba(239, 68, 68, 0.08);
 }
 
 .dark .line-highlight-low {
-  background-color: oklch(0.25 0.04 150);
+  background-color: rgba(34, 197, 94, 0.12);
 }
 .dark .line-highlight-medium {
-  background-color: oklch(0.25 0.04 90);
+  background-color: rgba(234, 179, 8, 0.12);
 }
 .dark .line-highlight-high {
-  background-color: oklch(0.25 0.04 25);
+  background-color: rgba(239, 68, 68, 0.12);
 }
 
-/* ─── Print / PDF Report ──────────────────────────────────────────── */
+/* ─── Print / PDF Report ───────────────────────────────────────────── */
 @media print {
-  /* Hide everything that's not the report */
   nav, footer, header,
   [data-print="hide"],
   .ad-banner,
@@ -122,7 +193,6 @@ body {
     display: none !important;
   }
 
-  /* Reset body */
   body {
     background: white !important;
     color: #111 !important;
@@ -131,34 +201,27 @@ body {
     print-color-adjust: exact;
   }
 
-  /* Ensure sections print cleanly */
+  body::before {
+    display: none !important;
+  }
+
+  .glass, .glass-subtle {
+    background: white !important;
+    border: 1px solid #e5e7eb !important;
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+  }
+
   section {
     break-inside: avoid;
     page-break-inside: avoid;
   }
 
-  /* Score cards look great on paper */
-  [data-print="score-card"] {
-    border: 1px solid #e5e7eb !important;
-    background: white !important;
-    padding: 16px !important;
-    margin-bottom: 12px !important;
-    break-inside: avoid;
-  }
-
-  /* SVG circles need explicit colors */
   svg circle {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  /* Metric bars */
-  [data-print="metric-bar"] > div {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  /* Report header */
   .print-report-header {
     display: block !important;
     text-align: center;
@@ -178,10 +241,5 @@ body {
     font-size: 9pt;
     color: #666;
     margin: 4px 0 0;
-  }
-
-  /* Hide screen-only header */
-  .print-report-header + div {
-    margin-top: 16px;
   }
 }

@@ -353,20 +353,20 @@ export default function Home() {
   // ─── Metric bar helper ────────────────────────────────────────────
 
   const MetricCard = ({ title, metric, delay }: { title: string; metric: { score: number; label: string; description: string }; delay: string }) => (
-    <div className={`animate-fade-in-up ${delay} rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900`}>
+    <div className={`animate-fade-in-up ${delay} glass-subtle rounded-xl p-4`}>
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{title}</span>
+        <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{title}</span>
         <span className={`text-sm font-bold ${metric.score < 30 ? "text-green-600 dark:text-green-400" : metric.score < 60 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}`}>
           {metric.score}%
         </span>
       </div>
-      <div className="mb-2 h-2 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+      <div className="mb-2 h-2 overflow-hidden rounded-full bg-black/5 dark:bg-white/10">
         <div
           className={`h-full rounded-full transition-all duration-700 ${metric.score < 30 ? "bg-green-500" : metric.score < 60 ? "bg-yellow-500" : "bg-red-500"}`}
           style={{ width: `${metric.score}%` }}
         />
       </div>
-      <p className="text-xs text-zinc-500 dark:text-zinc-400">{metric.label}</p>
+      <p className="text-xs" style={{ color: "var(--text-muted)" }}>{metric.label}</p>
     </div>
   );
 
@@ -383,10 +383,10 @@ export default function Home() {
       <section className="mx-auto w-full max-w-4xl px-4 py-10 sm:py-16">
         {/* Hero */}
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">
+          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
             Clean Up ChatGPT Text
           </h1>
-          <p className="mx-auto mt-3 max-w-xl text-base text-zinc-500 dark:text-zinc-400">
+          <p className="mx-auto mt-3 max-w-xl text-base">
             Fix trailing spaces, add periods, remove emojis — or check if your text sounds AI-generated.
             All processing happens in your browser.
           </p>
@@ -394,13 +394,13 @@ export default function Home() {
 
         {/* Tab bar */}
         <div className="mb-6 flex justify-center">
-          <div className="inline-flex rounded-xl border border-zinc-200 bg-zinc-50 p-1 dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="glass-subtle inline-flex rounded-xl p-1">
             <button
               onClick={() => setActiveTab("fix")}
               className={`rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
                 activeTab === "fix"
-                  ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-zinc-50"
-                  : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                  ? "bg-white/60 font-semibold shadow-sm backdrop-blur-sm"
+                  : "opacity-60 hover:opacity-100"
               }`}
             >
               ✏️ Fix Text
@@ -409,8 +409,8 @@ export default function Home() {
               onClick={() => setActiveTab("analyze")}
               className={`rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
                 activeTab === "analyze"
-                  ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-zinc-50"
-                  : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                  ? "bg-white/60 font-semibold shadow-sm backdrop-blur-sm"
+                  : "opacity-60 hover:opacity-100"
               }`}
             >
               🔍 AI Analyzer
@@ -419,8 +419,8 @@ export default function Home() {
               onClick={() => setActiveTab("readability")}
               className={`rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
                 activeTab === "readability"
-                  ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-zinc-50"
-                  : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                  ? "bg-white/60 font-semibold shadow-sm backdrop-blur-sm"
+                  : "opacity-60 hover:opacity-100"
               }`}
             >
               📊 Readability
@@ -430,16 +430,16 @@ export default function Home() {
 
         {/* ═══════════════ FIX TEXT TAB ═══════════════ */}
         {activeTab === "fix" && (
-          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6 dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="glass rounded-2xl p-4 sm:p-6">
             {/* Input */}
             <div className="mb-4">
               <div className="mb-2 flex items-center justify-between">
-                <label htmlFor="input-text" className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                <label htmlFor="input-text" className="text-xs font-medium uppercase tracking-wide">
                   Input
                 </label>
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="rounded-md border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                  className="rounded-md border border-white/20 bg-white/20 px-3 py-1 text-xs font-medium backdrop-blur-sm transition hover:bg-white/40"
                 >
                   Upload .txt
                 </button>
@@ -454,45 +454,45 @@ export default function Home() {
                 placeholder="Paste your ChatGPT text here, or upload a file..."
                 rows={8}
                 maxLength={100000}
-                className="w-full resize-y rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm leading-relaxed text-zinc-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-100 sm:rows-10"
+                className="w-full resize-y rounded-lg border border-white/30 bg-white/40 p-4 text-sm leading-relaxed outline-none backdrop-blur-sm transition focus:border-violet-400 focus:ring-2 focus:ring-violet-400/20 sm:rows-10"
               />
             </div>
 
             {/* Options */}
             <div className="mb-4 flex flex-wrap gap-3">
-              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2.5 transition select-none hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:hover:bg-zinc-700/50">
-                <input type="checkbox" checked={fixTrailing} onChange={(e) => setFixTrailing(e.target.checked)} className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500" />
-                <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Add periods (fix trailing spaces)</span>
+              <label className="glass-subtle flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2.5 transition select-none hover:bg-white/50">
+                <input type="checkbox" checked={fixTrailing} onChange={(e) => setFixTrailing(e.target.checked)} className="h-4 w-4 rounded border-white/30 text-violet-600 focus:ring-violet-500" />
+                <span className="text-sm font-medium">Add periods (fix trailing spaces)</span>
               </label>
-              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2.5 transition select-none hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:hover:bg-zinc-700/50">
-                <input type="checkbox" checked={removeEmojis} onChange={(e) => setRemoveEmojis(e.target.checked)} className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500" />
-                <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Remove emojis</span>
+              <label className="glass-subtle flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2.5 transition select-none hover:bg-white/50">
+                <input type="checkbox" checked={removeEmojis} onChange={(e) => setRemoveEmojis(e.target.checked)} className="h-4 w-4 rounded border-white/30 text-violet-600 focus:ring-violet-500" />
+                <span className="text-sm font-medium">Remove emojis</span>
               </label>
-              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2.5 transition select-none hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:hover:bg-zinc-700/50">
-                <input type="checkbox" checked={addHR} onChange={(e) => setAddHR(e.target.checked)} className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500" />
-                <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300"># → --- (horizontal rule before headings)</span>
+              <label className="glass-subtle flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2.5 transition select-none hover:bg-white/50">
+                <input type="checkbox" checked={addHR} onChange={(e) => setAddHR(e.target.checked)} className="h-4 w-4 rounded border-white/30 text-violet-600 focus:ring-violet-500" />
+                <span className="text-sm font-medium"># → --- (horizontal rule before headings)</span>
               </label>
             </div>
 
             {/* Actions */}
             <div className="mb-4 flex flex-wrap gap-2 sm:gap-3">
-              <button onClick={handleProcess} disabled={!input.trim() || (!fixTrailing && !removeEmojis && !addHR)} className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40">
+              <button onClick={handleProcess} disabled={!input.trim() || (!fixTrailing && !removeEmojis && !addHR)} className="flex-1 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-violet-500/20 transition hover:from-violet-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40">
                 Process
               </button>
-              <button onClick={handleCopy} disabled={!output} className="rounded-lg bg-zinc-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-zinc-700 dark:hover:bg-zinc-600">
+              <button onClick={handleCopy} disabled={!output} className="rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-violet-500/20 transition hover:from-violet-700 hover:to-indigo-700 disabled:cursor-not-allowed disabled:opacity-40">
                 {copied ? "Copied!" : "Copy Output"}
               </button>
-              <button onClick={handleDownload} disabled={!output} className="rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800">
+              <button onClick={handleDownload} disabled={!output} className="rounded-lg border border-white/20 bg-white/20 px-4 py-2.5 text-sm font-semibold backdrop-blur-sm transition hover:bg-white/40 disabled:cursor-not-allowed disabled:opacity-40">
                 Save .txt
               </button>
-              <button onClick={handleClear} className="rounded-lg border border-zinc-300 px-3 py-2.5 text-sm text-zinc-500 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800">
+              <button onClick={handleClear} className="rounded-lg border border-white/20 bg-white/10 px-3 py-2.5 text-sm backdrop-blur-sm transition hover:bg-white/30">
                 Clear
               </button>
             </div>
 
             {/* Stats */}
             {hasResults && (
-              <div role="status" className="mb-4 flex flex-wrap justify-center gap-4 rounded-lg bg-blue-50 px-4 py-2.5 text-sm text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
+              <div role="status" className="mb-4 flex flex-wrap justify-center gap-4 rounded-lg bg-violet-500/5 px-4 py-2.5 text-sm text-violet-700 dark:text-violet-300">
                 {periodsAdded !== null && fixTrailing && (
                   <span>{periodsAdded > 0 ? <>Added <span className="font-bold">{periodsAdded}</span> period{periodsAdded > 1 ? "s" : ""}</> : "No trailing-space lines found"}</span>
                 )}
@@ -507,7 +507,7 @@ export default function Home() {
 
             {/* Output */}
             <div>
-              <label htmlFor="output-text" className="mb-2 block text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+              <label htmlFor="output-text" className="mb-2 block text-xs font-medium uppercase tracking-wide opacity-60">
                 Output
               </label>
               <textarea
@@ -516,7 +516,7 @@ export default function Home() {
                 readOnly
                 placeholder="Processed text will appear here..."
                 rows={8}
-                className="w-full resize-y rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm leading-relaxed text-zinc-900 outline-none dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-100 sm:rows-10"
+                className="w-full resize-y rounded-lg border border-white/30 bg-white/40 p-4 text-sm leading-relaxed outline-none backdrop-blur-sm sm:rows-10"
               />
             </div>
           </div>
@@ -526,12 +526,12 @@ export default function Home() {
         {activeTab === "analyze" && (
           <div className="space-y-6">
             {/* Input */}
-            <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6 dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="glass rounded-2xl p-4 sm:p-6">
               <div className="mb-2 flex items-center justify-between">
-                <label htmlFor="analyzer-input" className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                <label htmlFor="analyzer-input" className="text-xs font-medium uppercase tracking-wide">
                   Paste your text
                 </label>
-                <button onClick={handleAnalyzerClear} className="rounded-md border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800">
+                <button onClick={handleAnalyzerClear} className="rounded-md border border-white/20 bg-white/20 px-3 py-1 text-xs font-medium backdrop-blur-sm transition hover:bg-white/40">
                   Clear
                 </button>
               </div>
@@ -544,15 +544,15 @@ export default function Home() {
                 placeholder="Paste any text to check if it sounds AI-generated..."
                 rows={6}
                 maxLength={100000}
-                className="w-full resize-y rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm leading-relaxed text-zinc-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-100"
+                className="w-full resize-y rounded-lg border border-white/30 bg-white/40 p-4 text-sm leading-relaxed outline-none backdrop-blur-sm transition focus:border-violet-400 focus:ring-2 focus:ring-violet-400/20"
               />
               {/* Character counter */}
               <div className="mt-1 flex items-center justify-between">
                 <span className={`text-[11px] ${
-                  analyzerInput.length === 0 ? "text-zinc-400"
+                  analyzerInput.length === 0 ? "opacity-40"
                     : analyzerInput.length < 50 ? "text-yellow-500"
                     : analyzerInput.length > 50000 ? "text-red-500"
-                    : "text-zinc-400"
+                    : "opacity-40"
                 }`}>
                   {analyzerInput.length === 0 ? ""
                     : analyzerInput.length < 50 ? `⚠️ ${analyzerInput.length}/50 min chars`
@@ -572,11 +572,11 @@ export default function Home() {
               <button
                 onClick={handleAnalyzeClick}
                 disabled={!analyzerInput.trim()}
-                className="mt-3 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+                className="mt-3 w-full rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-violet-500/20 transition hover:from-violet-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Analyze Text
               </button>
-              <p className="mt-2 text-center text-xs text-zinc-400 dark:text-zinc-500">
+              <p className="mt-2 text-center text-xs opacity-50">
                 💡 Pro tip: Just paste — auto-analyzes on paste!
               </p>
             </div>
@@ -590,10 +590,10 @@ export default function Home() {
                     {analysisResult.warnings.map((w, i) => (
                       <div key={i} className={`rounded-lg border px-4 py-2.5 text-sm ${
                         w.type === "code_detected" ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-400"
-                        : w.type === "non_english" ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-400"
+                        : w.type === "non_english" ? "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-400"
                         : w.type === "repeated_text" ? "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-900 dark:bg-orange-950/30 dark:text-orange-400"
                         : w.type === "too_long" ? "border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-900 dark:bg-yellow-950/30 dark:text-yellow-400"
-                        : "border-zinc-200 bg-zinc-50 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-400"
+                        : "border-white/20 bg-white/10 text-zinc-600 dark:text-zinc-400"
                       }`}>
                         {w.type === "code_detected" ? "🖥️" : w.type === "non_english" ? "🌐" : w.type === "repeated_text" ? "🔁" : w.type === "too_long" ? "📏" : "⚠️"} {w.message}
                       </div>
@@ -602,10 +602,10 @@ export default function Home() {
                 )}
 
                 {/* Score Circle */}
-                <div className="animate-pulse-once rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm text-center dark:border-zinc-800 dark:bg-zinc-900">
+                <div className="glass animate-pulse-once rounded-2xl p-6 text-center">
                   <div className="relative mx-auto mb-4 h-48 w-48">
                     <svg className="h-full w-full -rotate-90" viewBox="0 0 160 160">
-                      <circle cx="80" cy="80" r="70" fill="none" stroke="currentColor" strokeWidth="8" className="text-zinc-100 dark:text-zinc-800" />
+                      <circle cx="80" cy="80" r="70" fill="none" stroke="currentColor" strokeWidth="8" className="opacity-10" />
                       <circle
                         cx="80" cy="80" r="70" fill="none"
                         stroke={ringColor}
@@ -620,7 +620,7 @@ export default function Home() {
                       <span className={`text-5xl font-black ${scoreColor === "green" ? "text-green-600 dark:text-green-400" : scoreColor === "yellow" ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}`}>
                         {animatedScore}
                       </span>
-                      <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">% AI Score</span>
+                      <span className="text-xs font-medium opacity-70">% AI Score</span>
                     </div>
                   </div>
                   <p className={`text-lg font-bold ${scoreColor === "green" ? "text-green-700 dark:text-green-400" : scoreColor === "yellow" ? "text-yellow-700 dark:text-yellow-400" : "text-red-700 dark:text-red-400"}`}>
@@ -628,7 +628,7 @@ export default function Home() {
                   </p>
 
                   {/* Stats bar */}
-                  <div className="mt-4 flex flex-wrap justify-center gap-4 text-xs text-zinc-500 dark:text-zinc-400">
+                  <div className="mt-4 flex flex-wrap justify-center gap-4 text-xs opacity-70">
                     <span>{analysisResult.stats.wordCount} words</span>
                     <span>{analysisResult.stats.sentenceCount} sentences</span>
                     <span>{analysisResult.stats.readingTimeMin} min read</span>
@@ -639,7 +639,7 @@ export default function Home() {
                   <div className="mt-4 flex flex-wrap justify-center gap-2">
                     <button
                       onClick={handleShareScore}
-                      className="rounded-lg border border-zinc-300 px-4 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      className="rounded-lg border border-white/20 bg-white/20 px-4 py-2 text-xs font-semibold backdrop-blur-sm transition hover:bg-white/40"
                     >
                       {analyzerCopied ? "✅ Copied!" : "📋 Share your score"}
                     </button>
@@ -651,7 +651,7 @@ export default function Home() {
                     </button>
                     <button
                       onClick={() => window.print()}
-                      className="rounded-lg border border-zinc-300 px-4 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 no-print"
+                      className="rounded-lg border border-white/20 bg-white/20 px-4 py-2 text-xs font-semibold backdrop-blur-sm transition hover:bg-white/40 no-print"
                     >
                       📄 Export PDF Report
                     </button>
@@ -662,8 +662,8 @@ export default function Home() {
                 {humanizeResult && humanizedScore && (
                   <>
                     {/* Score comparison */}
-                    <div className="animate-fade-in-up rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-white p-6 shadow-sm dark:border-emerald-900 dark:from-emerald-950/30 dark:to-zinc-900">
-                      <h3 className="mb-4 text-center text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                    <div className="glass animate-fade-in-up rounded-2xl p-6">
+                      <h3 className="mb-4 text-center text-sm font-bold">
                         Before → After Humanization
                       </h3>
                       <div className="flex items-center justify-center gap-6">
@@ -671,30 +671,30 @@ export default function Home() {
                         <div className="text-center">
                           <div className="relative mx-auto h-24 w-24">
                             <svg className="h-full w-full -rotate-90" viewBox="0 0 160 160">
-                              <circle cx="80" cy="80" r="70" fill="none" stroke="currentColor" strokeWidth="8" className="text-zinc-100 dark:text-zinc-800" />
+                              <circle cx="80" cy="80" r="70" fill="none" stroke="currentColor" strokeWidth="8" className="opacity-10" />
                               <circle cx="80" cy="80" r="70" fill="none" stroke={ringColor} strokeWidth="8" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={circumference - (animatedScore / 100) * circumference} />
                             </svg>
                             <div className="absolute inset-0 flex flex-col items-center justify-center">
                               <span className={`text-2xl font-black ${scoreColor === "green" ? "text-green-600" : scoreColor === "yellow" ? "text-yellow-600" : "text-red-600"}`}>{animatedScore}</span>
                             </div>
                           </div>
-                          <span className="mt-1 block text-xs font-medium text-zinc-500">Before</span>
+                          <span className="mt-1 block text-xs font-medium opacity-60">Before</span>
                         </div>
 
-                        <span className="text-2xl text-zinc-300 dark:text-zinc-600">→</span>
+                        <span className="text-2xl opacity-30">→</span>
 
                         {/* After score */}
                         <div className="text-center">
                           <div className="relative mx-auto h-24 w-24">
                             <svg className="h-full w-full -rotate-90" viewBox="0 0 160 160">
-                              <circle cx="80" cy="80" r="70" fill="none" stroke="currentColor" strokeWidth="8" className="text-zinc-100 dark:text-zinc-800" />
+                              <circle cx="80" cy="80" r="70" fill="none" stroke="currentColor" strokeWidth="8" className="opacity-10" />
                               <circle cx="80" cy="80" r="70" fill="none" stroke="#22c55e" strokeWidth="8" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={circumference - (animatedHumanizedScore / 100) * circumference} className="animate-score-ring" />
                             </svg>
                             <div className="absolute inset-0 flex flex-col items-center justify-center">
                               <span className="text-2xl font-black text-green-600 dark:text-green-400">{animatedHumanizedScore}</span>
                             </div>
                           </div>
-                          <span className="mt-1 block text-xs font-medium text-zinc-500">After</span>
+                          <span className="mt-1 block text-xs font-medium opacity-60">After</span>
                         </div>
                       </div>
 
@@ -709,9 +709,9 @@ export default function Home() {
                     </div>
 
                     {/* Humanized text output */}
-                    <div className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+                    <div className="glass rounded-2xl p-5">
                       <div className="mb-3 flex items-center justify-between">
-                        <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Humanized Text</h3>
+                        <h3 className="text-sm font-bold">Humanized Text</h3>
                         <button
                           onClick={handleCopyHumanized}
                           className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700"
@@ -719,27 +719,27 @@ export default function Home() {
                           {analyzerCopied ? "✅ Copied!" : "📋 Copy"}
                         </button>
                       </div>
-                      <div className="max-h-64 overflow-y-auto rounded-lg border border-zinc-100 bg-zinc-50 p-4 text-sm leading-relaxed text-zinc-800 dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-200">
+                      <div className="glass-subtle max-h-64 overflow-y-auto rounded-lg p-4 text-sm leading-relaxed">
                         {humanizeResult.text}
                       </div>
                     </div>
 
                     {/* Changes log */}
                     {humanizeResult.changes.length > 0 && (
-                      <div className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+                      <div className="glass rounded-2xl p-5">
                         <details>
-                          <summary className="cursor-pointer text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                          <summary className="cursor-pointer text-sm font-bold">
                             🔄 Changes Made ({humanizeResult.totalChanges})
                           </summary>
                           <div className="mt-3 max-h-60 space-y-2 overflow-y-auto">
                             {humanizeResult.changes.map((change, i) => (
-                              <div key={i} className="flex items-start gap-2 rounded-md bg-zinc-50 px-3 py-2 text-xs dark:bg-zinc-800/50">
-                                <span className="shrink-0 rounded bg-blue-100 px-1.5 py-0.5 font-mono text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                              <div key={i} className="flex items-start gap-2 rounded-md bg-white/10 px-3 py-2 text-xs">
+                                <span className="shrink-0 rounded bg-violet-100 px-1.5 py-0.5 font-mono text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
                                   {change.type}
                                 </span>
                                 <div className="flex-1">
                                   <span className="text-red-500 line-through">{change.original}</span>
-                                  <span className="mx-1 text-zinc-400">→</span>
+                                  <span className="mx-1 opacity-40">→</span>
                                   <span className="text-green-600">{change.replacement}</span>
                                 </div>
                               </div>
@@ -750,8 +750,8 @@ export default function Home() {
                     )}
 
                     {/* ═══ Platform Formatter ═══ */}
-                    <div className="rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-white p-5 dark:border-violet-900 dark:from-violet-950/20 dark:to-zinc-900">
-                      <h3 className="mb-3 text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                    <div className="glass rounded-2xl p-5">
+                      <h3 className="mb-3 text-sm font-bold">
                         📱 Format for Platform
                       </h3>
                       <div className="flex flex-wrap gap-2">
@@ -765,7 +765,7 @@ export default function Home() {
                               className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
                                 isActive
                                   ? "border-violet-500 bg-violet-600 text-white shadow-sm"
-                                  : "border-zinc-200 bg-white text-zinc-700 hover:border-violet-300 hover:bg-violet-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-violet-700 dark:hover:bg-violet-900/30"
+                                  : "border-white/20 bg-white/20 text-zinc-700 hover:border-violet-300 hover:bg-violet-50/50 dark:text-zinc-300 dark:hover:border-violet-700 dark:hover:bg-violet-900/30"
                               }`}
                             >
                               {meta.icon} {meta.label}
@@ -777,10 +777,10 @@ export default function Home() {
 
                     {/* Platform formatted output */}
                     {platformResult && (
-                      <div className="animate-fade-in-up rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+                      <div className="glass animate-fade-in-up rounded-2xl p-5">
                         <div className="mb-3 flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                            <h3 className="text-sm font-bold">
                               {PLATFORM_META[platformResult.platform].icon} {PLATFORM_META[platformResult.platform].label} Format
                             </h3>
                             {platformResult.charLimit && (
@@ -795,7 +795,7 @@ export default function Home() {
                               </span>
                             )}
                             {!platformResult.charLimit && (
-                              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                              <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
                                 {platformResult.charCount} chars
                               </span>
                             )}
@@ -809,7 +809,7 @@ export default function Home() {
                         </div>
 
                         {/* Formatted text preview */}
-                        <div className="max-h-72 overflow-y-auto rounded-lg border border-zinc-100 bg-zinc-50 p-4 text-sm leading-relaxed text-zinc-800 whitespace-pre-wrap dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-200">
+                        <div className="glass-subtle max-h-72 overflow-y-auto rounded-lg p-4 text-sm leading-relaxed whitespace-pre-wrap">
                           {platformResult.text}
                         </div>
 
@@ -817,7 +817,7 @@ export default function Home() {
                         {platformResult.tips.length > 0 && (
                           <div className="mt-3 space-y-1">
                             {platformResult.tips.map((tip, i) => (
-                              <p key={i} className="text-xs text-zinc-500 dark:text-zinc-400">
+                              <p key={i} className="text-xs opacity-60">
                                 💡 {tip}
                               </p>
                             ))}
@@ -830,7 +830,7 @@ export default function Home() {
 
                 {/* Metric Breakdown */}
                 <div>
-                  <h3 className="mb-3 text-sm font-bold text-zinc-900 dark:text-zinc-100">Score Breakdown</h3>
+                  <h3 className="mb-3 text-sm font-bold">Score Breakdown</h3>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <MetricCard title="Zipf Conformity" metric={analysisResult.metrics.zipfConformity} delay="delay-100" />
                     <MetricCard title="AI Phrases" metric={analysisResult.metrics.aiPhrases} delay="delay-150" />
@@ -847,13 +847,13 @@ export default function Home() {
 
                 {/* Tips */}
                 {analysisResult.tips.length > 0 && (
-                  <div className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-                    <h3 className="mb-3 text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                  <div className="glass rounded-2xl p-5">
+                    <h3 className="mb-3 text-sm font-bold">
                       {analysisResult.overall < 30 ? "✅ Looking Good" : "💡 Tips to Sound More Human"}
                     </h3>
                     <ul className="space-y-2">
                       {analysisResult.tips.map((tip, i) => (
-                        <li key={i} className="flex items-start gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+                        <li key={i} className="flex items-start gap-2 text-sm opacity-80">
                           <span className="mt-0.5 shrink-0">{analysisResult.overall < 30 ? "👍" : "→"}</span>
                           <span>{tip}</span>
                         </li>
@@ -864,8 +864,8 @@ export default function Home() {
 
                 {/* Line-by-line */}
                 {analysisResult.lineScores.length > 0 && (
-                  <div className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-                    <h3 className="mb-3 text-sm font-bold text-zinc-900 dark:text-zinc-100">Line-by-Line Analysis</h3>
+                  <div className="glass rounded-2xl p-5">
+                    <h3 className="mb-3 text-sm font-bold">Line-by-Line Analysis</h3>
                     <div className="max-h-80 space-y-1 overflow-y-auto">
                       {analysisResult.lineScores.map((ls) => (
                         <div
@@ -874,8 +874,8 @@ export default function Home() {
                             ls.score < 20 ? "line-highlight-low" : ls.score < 50 ? "line-highlight-medium" : "line-highlight-high"
                           }`}
                         >
-                          <span className="shrink-0 font-mono text-zinc-400 dark:text-zinc-500">{ls.line}.</span>
-                          <span className="flex-1 text-zinc-700 dark:text-zinc-300">{ls.text}</span>
+                          <span className="shrink-0 font-mono opacity-40">{ls.line}.</span>
+                          <span className="flex-1">{ls.text}</span>
                           <span className={`shrink-0 text-[10px] font-medium ${ls.score >= 50 ? "text-red-500" : ls.score >= 20 ? "text-yellow-600" : "text-green-600"}`}>
                             {ls.score}%
                           </span>
@@ -893,12 +893,12 @@ export default function Home() {
         {activeTab === "readability" && (
           <div className="space-y-6">
             {/* Input */}
-            <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6 dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="glass rounded-2xl p-4 sm:p-6">
               <div className="mb-2 flex items-center justify-between">
-                <label htmlFor="readability-input" className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                <label htmlFor="readability-input" className="text-xs font-medium uppercase tracking-wide">
                   Paste your text
                 </label>
-                <button onClick={handleReadabilityClear} className="rounded-md border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800">
+                <button onClick={handleReadabilityClear} className="rounded-md border border-white/20 bg-white/20 px-3 py-1 text-xs font-medium backdrop-blur-sm transition hover:bg-white/40">
                   Clear
                 </button>
               </div>
@@ -911,10 +911,10 @@ export default function Home() {
                 placeholder="Paste any text to analyze readability, grade level, and reading difficulty..."
                 rows={6}
                 maxLength={100000}
-                className="w-full resize-y rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm leading-relaxed text-zinc-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-100"
+                className="w-full resize-y rounded-lg border border-white/30 bg-white/40 p-4 text-sm leading-relaxed outline-none backdrop-blur-sm transition focus:border-violet-400 focus:ring-2 focus:ring-violet-400/20"
               />
               <div className="mt-1 flex items-center justify-between">
-                <span className={`text-[11px] ${readabilityInput.length === 0 ? "text-zinc-400" : readabilityInput.length < 50 ? "text-yellow-500" : readabilityInput.length > 50000 ? "text-red-500" : "text-zinc-400"}`}>
+                <span className={`text-[11px] ${readabilityInput.length === 0 ? "opacity-40" : readabilityInput.length < 50 ? "text-yellow-500" : readabilityInput.length > 50000 ? "text-red-500" : "opacity-40"}`}>
                   {readabilityInput.length === 0 ? "" : readabilityInput.length < 50 ? `⚠️ ${readabilityInput.length}/50 min chars` : `${readabilityInput.length.toLocaleString()} characters`}
                 </span>
               </div>
@@ -923,7 +923,7 @@ export default function Home() {
                   ⚠️ {readabilityError}
                 </div>
               )}
-              <p className="mt-2 text-center text-xs text-zinc-400 dark:text-zinc-500">
+              <p className="mt-2 text-center text-xs opacity-50">
                 💡 Paste your text — auto-analyzes readability on paste!
               </p>
             </div>
@@ -932,10 +932,10 @@ export default function Home() {
             {readabilityResult && (
               <>
                 {/* Score Circle + Grade */}
-                <div className="animate-pulse-once rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm text-center dark:border-zinc-800 dark:bg-zinc-900">
+                <div className="glass animate-pulse-once rounded-2xl p-6 text-center">
                   <div className="relative mx-auto mb-4 h-48 w-48">
                     <svg className="h-full w-full -rotate-90" viewBox="0 0 160 160">
-                      <circle cx="80" cy="80" r="70" fill="none" stroke="currentColor" strokeWidth="8" className="text-zinc-100 dark:text-zinc-800" />
+                      <circle cx="80" cy="80" r="70" fill="none" stroke="currentColor" strokeWidth="8" className="opacity-10" />
                       <circle
                         cx="80" cy="80" r="70" fill="none"
                         stroke={readabilityResult.gradeColor === "green" ? "#22c55e" : readabilityResult.gradeColor === "yellow" ? "#eab308" : readabilityResult.gradeColor === "orange" ? "#f97316" : "#ef4444"}
@@ -950,19 +950,19 @@ export default function Home() {
                       <span className={`text-3xl font-black ${readabilityResult.gradeColor === "green" ? "text-green-600 dark:text-green-400" : readabilityResult.gradeColor === "yellow" ? "text-yellow-600 dark:text-yellow-400" : readabilityResult.gradeColor === "orange" ? "text-orange-600 dark:text-orange-400" : "text-red-600 dark:text-red-400"}`}>
                         {readabilityResult.grade}
                       </span>
-                      <span className="text-lg font-bold text-zinc-700 dark:text-zinc-300">{readabilityResult.fleschScore}</span>
-                      <span className="text-[10px] font-medium text-zinc-400">Flesch Score</span>
+                      <span className="text-lg font-bold">{readabilityResult.fleschScore}</span>
+                      <span className="text-[10px] font-medium opacity-50">Flesch Score</span>
                     </div>
                   </div>
                   <p className={`text-lg font-bold ${readabilityResult.gradeColor === "green" ? "text-green-700 dark:text-green-400" : readabilityResult.gradeColor === "yellow" ? "text-yellow-700 dark:text-yellow-400" : readabilityResult.gradeColor === "orange" ? "text-orange-700 dark:text-orange-400" : "text-red-700 dark:text-red-400"}`}>
                     {readabilityResult.readingLevel}
                   </p>
-                  <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                  <p className="mt-1 text-sm opacity-70">
                     🎯 {readabilityResult.audience}
                   </p>
 
                   {/* Stats bar */}
-                  <div className="mt-4 flex flex-wrap justify-center gap-4 text-xs text-zinc-500 dark:text-zinc-400">
+                  <div className="mt-4 flex flex-wrap justify-center gap-4 text-xs opacity-70">
                     <span>{readabilityResult.stats.wordCount} words</span>
                     <span>{readabilityResult.stats.sentenceCount} sentences</span>
                     <span>Avg {readabilityResult.stats.avgWordsPerSentence} words/sentence</span>
@@ -974,13 +974,13 @@ export default function Home() {
                   <div className="mt-4 flex flex-wrap justify-center gap-2">
                     <button
                       onClick={handleCopyReadability}
-                      className="rounded-lg border border-zinc-300 px-4 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      className="rounded-lg border border-white/20 bg-white/20 px-4 py-2 text-xs font-semibold backdrop-blur-sm transition hover:bg-white/40"
                     >
                       {readabilityCopied ? "✅ Copied!" : "📋 Share Readability Report"}
                     </button>
                     <button
                       onClick={() => window.print()}
-                      className="rounded-lg border border-zinc-300 px-4 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 no-print"
+                      className="rounded-lg border border-white/20 bg-white/20 px-4 py-2 text-xs font-semibold backdrop-blur-sm transition hover:bg-white/40 no-print"
                     >
                       📄 Export PDF Report
                     </button>
@@ -988,34 +988,34 @@ export default function Home() {
                 </div>
 
                 {/* Content Quality Stats */}
-                <div className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-                  <h3 className="mb-3 text-sm font-bold text-zinc-900 dark:text-zinc-100">Content Quality</h3>
+                <div className="glass rounded-2xl p-5">
+                  <h3 className="mb-3 text-sm font-bold">Content Quality</h3>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <div className="rounded-lg bg-zinc-50 p-3 text-center dark:bg-zinc-800/50">
-                      <span className="block text-lg font-bold text-zinc-900 dark:text-zinc-100">{readabilityResult.stats.avgSyllablesPerWord}</span>
-                      <span className="text-[10px] text-zinc-500">Syllables/Word</span>
+                    <div className="glass-subtle rounded-lg p-3 text-center">
+                      <span className="block text-lg font-bold">{readabilityResult.stats.avgSyllablesPerWord}</span>
+                      <span className="text-[10px] opacity-50">Syllables/Word</span>
                     </div>
-                    <div className="rounded-lg bg-zinc-50 p-3 text-center dark:bg-zinc-800/50">
-                      <span className="block text-lg font-bold text-zinc-900 dark:text-zinc-100">{readabilityResult.stats.avgWordLength}</span>
-                      <span className="text-[10px] text-zinc-500">Avg Word Length</span>
+                    <div className="glass-subtle rounded-lg p-3 text-center">
+                      <span className="block text-lg font-bold">{readabilityResult.stats.avgWordLength}</span>
+                      <span className="text-[10px] opacity-50">Avg Word Length</span>
                     </div>
-                    <div className={`rounded-lg p-3 text-center ${readabilityResult.stats.complexWordRatio > 0.15 ? "bg-orange-50 dark:bg-orange-950/20" : "bg-zinc-50 dark:bg-zinc-800/50"}`}>
-                      <span className="block text-lg font-bold text-zinc-900 dark:text-zinc-100">{Math.round(readabilityResult.stats.complexWordRatio * 100)}%</span>
-                      <span className="text-[10px] text-zinc-500">Complex Words</span>
+                    <div className={`rounded-lg p-3 text-center ${readabilityResult.stats.complexWordRatio > 0.15 ? "bg-orange-100/50 dark:bg-orange-950/20" : "bg-white/10"}`}>
+                      <span className="block text-lg font-bold">{Math.round(readabilityResult.stats.complexWordRatio * 100)}%</span>
+                      <span className="text-[10px] opacity-50">Complex Words</span>
                     </div>
-                    <div className={`rounded-lg p-3 text-center ${readabilityResult.stats.longSentenceRatio > 0.3 ? "bg-orange-50 dark:bg-orange-950/20" : "bg-zinc-50 dark:bg-zinc-800/50"}`}>
-                      <span className="block text-lg font-bold text-zinc-900 dark:text-zinc-100">{readabilityResult.stats.longSentenceCount}</span>
-                      <span className="text-[10px] text-zinc-500">Long Sentences (25+)</span>
+                    <div className={`rounded-lg p-3 text-center ${readabilityResult.stats.longSentenceRatio > 0.3 ? "bg-orange-100/50 dark:bg-orange-950/20" : "bg-white/10"}`}>
+                      <span className="block text-lg font-bold">{readabilityResult.stats.longSentenceCount}</span>
+                      <span className="text-[10px] opacity-50">Long Sentences (25+)</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Grade Level Metrics */}
                 <div>
-                  <h3 className="mb-3 text-sm font-bold text-zinc-900 dark:text-zinc-100">Grade Level Breakdown</h3>
+                  <h3 className="mb-3 text-sm font-bold">Grade Level Breakdown</h3>
                   <div className="space-y-2">
                     {Object.entries(readabilityResult.metrics).map(([key, metric]) => (
-                      <div key={key} className="flex items-center gap-3 rounded-lg border border-zinc-100 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
+                      <div key={key} className="glass-subtle flex items-center gap-3 rounded-lg px-4 py-3">
                         <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-bold ${
                           metric.value <= 6 ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                           : metric.value <= 10 ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
@@ -1024,7 +1024,7 @@ export default function Home() {
                         }`}>
                           {metric.label}
                         </span>
-                        <span className="flex-1 text-xs text-zinc-500 dark:text-zinc-400">{metric.description}</span>
+                        <span className="flex-1 text-xs opacity-60">{metric.description}</span>
                         <span className={`text-xs font-medium ${
                           metric.value <= 6 ? "text-green-600 dark:text-green-400"
                           : metric.value <= 10 ? "text-yellow-600 dark:text-yellow-400"
@@ -1040,13 +1040,13 @@ export default function Home() {
 
                 {/* Tips */}
                 {readabilityResult.tips.length > 0 && (
-                  <div className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-                    <h3 className="mb-3 text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                  <div className="glass rounded-2xl p-5">
+                    <h3 className="mb-3 text-sm font-bold">
                       {readabilityResult.fleschScore >= 60 ? "✅ Looking Good" : "💡 Tips to Improve Readability"}
                     </h3>
                     <ul className="space-y-2">
                       {readabilityResult.tips.map((tip, i) => (
-                        <li key={i} className="flex items-start gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+                        <li key={i} className="flex items-start gap-2 text-sm opacity-80">
                           <span className="mt-0.5 shrink-0">{readabilityResult.fleschScore >= 60 ? "👍" : "→"}</span>
                           <span>{tip}</span>
                         </li>
@@ -1057,20 +1057,20 @@ export default function Home() {
 
                 {/* Sentence Analysis */}
                 {readabilityResult.sentenceAnalysis.length > 0 && (
-                  <div className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-                    <h3 className="mb-3 text-sm font-bold text-zinc-900 dark:text-zinc-100">Sentence Analysis</h3>
+                  <div className="glass rounded-2xl p-5">
+                    <h3 className="mb-3 text-sm font-bold">Sentence Analysis</h3>
                     <div className="max-h-80 space-y-1 overflow-y-auto">
                       {readabilityResult.sentenceAnalysis.map((sa) => (
                         <div
                           key={sa.index}
                           className={`flex items-start gap-2 rounded-md px-3 py-2 text-xs ${
-                            sa.isLong ? "bg-orange-50 dark:bg-orange-950/20" : "bg-zinc-50 dark:bg-zinc-800/50"
+                            sa.isLong ? "bg-orange-100/50 dark:bg-orange-950/20" : "bg-white/10"
                           }`}
                         >
-                          <span className="shrink-0 font-mono text-zinc-400 dark:text-zinc-500">{sa.index}.</span>
-                          <span className="flex-1 text-zinc-700 dark:text-zinc-300">{sa.text}</span>
+                          <span className="shrink-0 font-mono opacity-40">{sa.index}.</span>
+                          <span className="flex-1">{sa.text}</span>
                           <div className="shrink-0 flex items-center gap-1.5">
-                            <span className={`text-[10px] font-medium ${sa.isLong ? "text-orange-600 dark:text-orange-400" : "text-zinc-400"}`}>
+                            <span className={`text-[10px] font-medium ${sa.isLong ? "text-orange-600 dark:text-orange-400" : "opacity-40"}`}>
                               {sa.wordCount}w
                             </span>
                             {sa.complexWords.length > 0 && (
@@ -1095,7 +1095,7 @@ export default function Home() {
 
         {/* FAQ */}
         <section className="mx-auto mt-16 max-w-3xl">
-          <h2 className="mb-6 text-center text-xl font-bold text-zinc-900 dark:text-zinc-100">
+          <h2 className="mb-6 text-center text-xl font-bold">
             Frequently Asked Questions
           </h2>
           <div className="space-y-4">
@@ -1133,11 +1133,11 @@ export default function Home() {
                 a: "Yes. Once the page loads, all text processing runs locally in your browser. You can also use our Python CLI tool for offline processing.",
               },
             ].map((faq) => (
-              <details key={faq.q} className="group rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-                <summary className="cursor-pointer px-5 py-4 text-sm font-medium text-zinc-900 group-open:text-blue-600 dark:text-zinc-100 dark:group-open:text-blue-400">
+              <details key={faq.q} className="glass-subtle group rounded-lg">
+                <summary className="cursor-pointer px-5 py-4 text-sm font-medium group-open:text-violet-600 dark:group-open:text-violet-400">
                   {faq.q}
                 </summary>
-                <p className="px-5 pb-4 text-sm text-zinc-500 dark:text-zinc-400">{faq.a}</p>
+                <p className="px-5 pb-4 text-sm opacity-60">{faq.a}</p>
               </details>
             ))}
           </div>

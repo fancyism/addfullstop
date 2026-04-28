@@ -3,24 +3,27 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 
 export function Header() {
   return (
-    <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+    <header className="glass sticky top-0 z-50 border-b border-white/20 dark:border-white/5">
       <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-4">
         <Link
           href="/"
-          className="text-lg font-bold tracking-tight text-zinc-900 transition hover:text-blue-600 dark:text-zinc-50 dark:hover:text-blue-400"
+          className="text-lg font-bold tracking-tight transition hover:opacity-80"
+          style={{ color: "var(--text-primary)" }}
         >
-          AddFullStop<span className="text-blue-600 dark:text-blue-400">.</span>
+          AddFullStop<span className="text-violet-500">.</span>
         </Link>
         <nav className="flex items-center gap-4">
           <Link
             href="/about"
-            className="text-sm text-zinc-500 transition hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+            className="text-sm transition hover:opacity-70"
+            style={{ color: "var(--text-secondary)" }}
           >
             About
           </Link>
           <Link
             href="/privacy"
-            className="text-sm text-zinc-500 transition hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 hidden sm:block"
+            className="hidden text-sm transition hover:opacity-70 sm:block"
+            style={{ color: "var(--text-secondary)" }}
           >
             Privacy
           </Link>
