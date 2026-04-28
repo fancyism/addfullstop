@@ -111,3 +111,81 @@ body {
     background-color: oklch(0.25 0.04 25);
   }
 }
+
+/* ─── Print / PDF Report ──────────────────────────────────────────── */
+@media print {
+  /* Hide everything that's not the report */
+  nav, footer, header,
+  [data-print="hide"],
+  .ad-banner,
+  button[onclick],
+  details,
+  textarea,
+  input[type="file"],
+  .no-print {
+    display: none !important;
+  }
+
+  /* Reset body */
+  body {
+    background: white !important;
+    color: #111 !important;
+    font-size: 11pt;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Ensure sections print cleanly */
+  section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Score cards look great on paper */
+  [data-print="score-card"] {
+    border: 1px solid #e5e7eb !important;
+    background: white !important;
+    padding: 16px !important;
+    margin-bottom: 12px !important;
+    break-inside: avoid;
+  }
+
+  /* SVG circles need explicit colors */
+  svg circle {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Metric bars */
+  [data-print="metric-bar"] > div {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Report header */
+  .print-report-header {
+    display: block !important;
+    text-align: center;
+    padding: 20px 0;
+    border-bottom: 2px solid #111;
+    margin-bottom: 24px;
+  }
+
+  .print-report-header h1 {
+    font-size: 18pt;
+    font-weight: 800;
+    color: #111;
+    margin: 0;
+  }
+
+  .print-report-header p {
+    font-size: 9pt;
+    color: #666;
+    margin: 4px 0 0;
+  }
+
+  /* Hide screen-only header */
+  .print-report-header + div {
+    margin-top: 16px;
+  }
+}

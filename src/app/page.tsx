@@ -372,7 +372,13 @@ export default function Home() {
 
   return (
     <>
-      <AdBanner slot="horizontal" />
+      {/* Print-only report header — hidden on screen, visible in PDF */}
+      <div className="print-report-header" style={{ display: "none" }}>
+        <h1>AddFullStop — Text Analysis Report</h1>
+        <p>Generated {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })} • addfullstop.vercel.app</p>
+      </div>
+
+      <AdBanner slot="horizontal" data-print="hide" />
 
       <section className="mx-auto w-full max-w-4xl px-4 py-10 sm:py-16">
         {/* Hero */}
@@ -629,7 +635,7 @@ export default function Home() {
                     <span>Avg {analysisResult.stats.avgSentenceLength} words/sentence</span>
                   </div>
 
-                  {/* Share + Humanize buttons */}
+                  {/* Share + Humanize + Export buttons */}
                   <div className="mt-4 flex flex-wrap justify-center gap-2">
                     <button
                       onClick={handleShareScore}
@@ -642,6 +648,12 @@ export default function Home() {
                       className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
                     >
                       ✨ Humanize This Text
+                    </button>
+                    <button
+                      onClick={() => window.print()}
+                      className="rounded-lg border border-zinc-300 px-4 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 no-print"
+                    >
+                      📄 Export PDF Report
                     </button>
                   </div>
                 </div>
@@ -959,12 +971,18 @@ export default function Home() {
                   </div>
 
                   {/* Share button */}
-                  <div className="mt-4 flex justify-center">
+                  <div className="mt-4 flex flex-wrap justify-center gap-2">
                     <button
                       onClick={handleCopyReadability}
                       className="rounded-lg border border-zinc-300 px-4 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
                     >
                       {readabilityCopied ? "✅ Copied!" : "📋 Share Readability Report"}
+                    </button>
+                    <button
+                      onClick={() => window.print()}
+                      className="rounded-lg border border-zinc-300 px-4 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 no-print"
+                    >
+                      📄 Export PDF Report
                     </button>
                   </div>
                 </div>
