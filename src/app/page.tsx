@@ -17,6 +17,8 @@ import { generateScript, SCRIPT_ROLES } from "@/lib/scriptGenerator";
 import type { ScriptRole, GeneratedScript } from "@/lib/scriptGenerator";
 import { aiClient, fetchModels, setModel, getModel } from "@/lib/aiClient";
 import type { AISource, ModelInfo } from "@/lib/aiClient";
+import { REWRITE_STYLES } from "@/lib/paraphraser";
+import type { RewriteStyle } from "@/lib/paraphraser";
 import { AdBanner } from "@/components/AdBanner";
 
 // ─── Clipboard with fallback ──────────────────────────────────────────
@@ -43,7 +45,7 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-type Tab = "fix" | "analyze" | "readability" | "tone" | "script";
+type Tab = "fix" | "analyze" | "readability" | "tone" | "script" | "rewrite";
 
 export default function Home() {
   // Tab
@@ -115,6 +117,12 @@ export default function Home() {
   const [scriptContext, setScriptContext] = useState("");
   const [scriptResult, setScriptResult] = useState<GeneratedScript | null>(null);
   const [scriptCopied, setScriptCopied] = useState(false);
+
+  // Rewrite state
+  const [rewriteInput, setRewriteInput] = useState("");
+  const [rewriteStyle, setRewriteStyle] = useState<RewriteStyle>("casual");
+  const [rewriteResult, setRewriteResult] = useState<{ rewritten: string; style: RewriteStyle; source: string } | null>(null);
+  const [rewriteCopied, setRewriteCopied] = useState(false);
 
   // ─── Fix Text logic ───────────────────────────────────────────────
 
@@ -449,6 +457,31 @@ export default function Home() {
     }
   }, [scriptRole, scriptContext]);
 
+  // ─── Rewrite logic ──────────────────────────────────────────────────
+
+  const handleRewrite = useCallback(async () => {
+    if (!rewriteInput.trim()) return;
+    setAiChecking(true);
+    try {
+      const { source, result } = await aiClient.rewrite(rewriteInput, rewriteStyle);
+      setAiSource(source);
+      setRewriteResult({ rewritten: result.rewritten, style: result.style, source });
+    } finally {
+      setAiChecking(false);
+    }
+  }, [rewriteInput, rewriteStyle]);
+
+  const handleCopyRewrite = useCallback(async () => {
+    if (!rewriteResult) return;
+    const ok = await copyToClipboard(rewriteResult.rewritten);
+    if (ok) { setRewriteCopied(true); setTimeout(() => setRewriteCopied(false), 2000); }
+  }, [rewriteResult]);
+
+  const handleClearRewrite = useCallback(() => {
+    setRewriteInput("");
+    setRewriteResult(null);
+  }, []);
+
   const handleCopyScript = useCallback(async () => {
     if (!scriptResult) return;
     const lines: string[] = [];
@@ -696,6 +729,16 @@ export default function Home() {
               }`}
             >
               🎬 Script
+            </button>
+            <button
+              onClick={() => setActiveTab("rewrite")}
+              className={`rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
+                activeTab === "rewrite"
+                  ? "bg-white/60 font-semibold shadow-sm backdrop-blur-sm"
+                  : "opacity-60 hover:opacity-100"
+              }`}
+            >
+              🔄 Rewrite
             </button>
           </div>
         </div>
@@ -1704,6 +1747,91 @@ export default function Home() {
                 <div className="text-4xl mb-3">🎬</div>
                 <div className="text-sm font-bold">Choose a role & describe your context</div>
                 <div className="mt-1 text-xs opacity-50">We generate structured speaking scripts for 8 different roles</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ═══════════════ REWRITE TAB ═══════════════ */}
+        {activeTab === "rewrite" && (
+          <div className="glass rounded-2xl p-4 sm:p-6">
+            <div className="mb-4">
+              <h2 className="text-lg font-bold">Rewrite / Paraphrase</h2>
+              <p className="mt-1 text-sm opacity-60">Transform your text into 8 different writing styles — powered by AI with heuristic fallback.</p>
+            </div>
+
+            {/* Style selector */}
+            <div className="mb-4">
+              <label className="mb-2 block text-xs font-medium uppercase tracking-wide">Target Style</label>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {REWRITE_STYLES.map((s) => (
+                  <button
+                    key={s.style}
+                    onClick={() => setRewriteStyle(s.style)}
+                    className={`rounded-xl border p-3 text-left transition ${
+                      rewriteStyle === s.style
+                        ? "border-white/40 bg-white/30 shadow-sm"
+                        : "border-white/10 bg-white/5 hover:bg-white/15"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{s.emoji}</span>
+                      <span className="text-sm font-semibold">{s.label}</span>
+                    </div>
+                    <div className="mt-1 text-[11px] leading-tight opacity-50">{s.description}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Input */}
+            <div className="mb-4">
+              <div className="mb-2 flex items-center justify-between">
+                <label htmlFor="rewrite-input" className="text-xs font-medium uppercase tracking-wide">Input Text</label>
+                <button onClick={handleClearRewrite} className="rounded-md border border-white/20 bg-white/20 px-3 py-1 text-xs font-medium backdrop-blur-sm transition hover:bg-white/40">
+                  Clear
+                </button>
+              </div>
+              <textarea
+                id="rewrite-input"
+                value={rewriteInput}
+                onChange={(e) => setRewriteInput(e.target.value)}
+                placeholder="Paste or type text to rewrite..."
+                rows={6}
+                className="w-full resize-none rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm backdrop-blur-sm placeholder:text-white/30 focus:border-white/40 focus:outline-none"
+              />
+            </div>
+
+            {/* Action */}
+            <button
+              onClick={handleRewrite}
+              disabled={aiChecking || !rewriteInput.trim()}
+              className="mb-4 w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:from-violet-500 hover:to-indigo-500 disabled:opacity-40"
+            >
+              {aiChecking ? "Rewriting..." : `Rewrite as ${REWRITE_STYLES.find(s => s.style === rewriteStyle)?.label ?? rewriteStyle}`}
+            </button>
+
+            {/* Output */}
+            {rewriteResult && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium uppercase tracking-wide">Rewritten Text</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                      rewriteResult.source === "ai" ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/20 text-amber-300"
+                    }`}>
+                      {rewriteResult.source === "ai" ? "AI" : "HEURISTIC"}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={handleCopyRewrite} className="rounded-md border border-white/20 bg-white/20 px-3 py-1 text-xs font-medium backdrop-blur-sm transition hover:bg-white/40">
+                      {rewriteCopied ? "Copied!" : "Copy"}
+                    </button>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-white/15 bg-white/10 p-4 text-sm leading-relaxed whitespace-pre-wrap backdrop-blur-sm">
+                  {rewriteResult.rewritten}
+                </div>
               </div>
             )}
           </div>

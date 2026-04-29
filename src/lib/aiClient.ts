@@ -19,6 +19,8 @@ import type { ToneResult, ToneType } from "./toneAnalyzer";
 import { TONE_META } from "./toneAnalyzer";
 import { generateScript } from "./scriptGenerator";
 import type { ScriptRole, GeneratedScript } from "./scriptGenerator";
+import { rewriteText } from "./paraphraser";
+import type { RewriteStyle, RewriteResult } from "./paraphraser";
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
@@ -42,6 +44,11 @@ export interface AIToneResult {
 export interface AIScriptResult {
   source: AISource;
   result: GeneratedScript | null;
+}
+
+export interface AIRewriteResult {
+  source: AISource;
+  result: RewriteResult;
 }
 
 export interface ModelInfo {
@@ -252,6 +259,30 @@ export const aiClient = {
     }
 
     return { source: "heuristic", result: generateScript(role, context) };
+  },
+
+  /**
+   * AI-powered rewrite/paraphrase in a target style.
+   * Falls back to heuristic transformations.
+   */
+  async rewrite(text: string, style: RewriteStyle): Promise<AIRewriteResult> {
+    const { ok, data, source } = await callAI("rewrite", { text, style });
+
+    if (ok && data && typeof data === "string") {
+      const rewrittenText = data as string;
+      const changes = computeChanges(text, rewrittenText);
+      return {
+        source,
+        result: {
+          original: text,
+          rewritten: rewrittenText,
+          style,
+          changes,
+        },
+      };
+    }
+
+    return { source: "heuristic", result: rewriteText(text, style) };
   },
 };
 

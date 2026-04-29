@@ -145,6 +145,29 @@ Make it REAL and PRACTICAL:
 - Add conversational openers and closers
 - Consider the specific context the user provided
 - Make it sound like a confident professional, not a robot reading a script`,
+
+  rewrite: `You are an expert text rewriter. Rewrite the provided text in a specific target style while preserving ALL meaning and key information.
+
+The user wants the text rewritten in the style: {{STYLE}}
+
+STYLE DEFINITIONS:
+- academic: Formal, scholarly, objective, cites reasoning, uses precise terminology, complex sentence structures, third person, no contractions, hedging language ("it appears that", "evidence suggests")
+- business: Professional but accessible, direct, action-oriented, concise, uses business terminology appropriately, structured with clear points, confident tone
+- creative: Engaging, vivid, uses metaphors and storytelling, varied rhythm, sensory details, hooks the reader, conversational but polished, unexpected word choices
+- casual: Like talking to a friend — contractions, slang OK, short sentences, informal connectors ("so", "anyway", "honestly"), fragments OK, emoji-friendly, direct
+- simple: ELI5 — explain like I'm 5 years old. Short words only, short sentences, no jargon, analogies from everyday life, one idea per sentence, active voice
+- email: Professional email format — clear subject line, greeting, structured body with purpose stated upfront, call to action, professional sign-off, concise
+- formal: Official/legal tone — precise language, no contractions, passive voice OK, structured, authoritative, no colloquialisms, third person preferred
+- technical: Documentation style — clear, precise, structured with headers, code examples if relevant, assumes technical audience, uses proper terminology, step-by-step where appropriate
+
+RULES:
+- Preserve ALL facts, numbers, names, dates, and key information
+- Keep the same language (Thai stays Thai, English stays English)
+- Do NOT add new information or opinions
+- Do NOT remove important details
+- Return ONLY the rewritten text. No JSON. No explanation.
+
+Rewrite the text now in {{STYLE}} style.`,
 };
 
 // ─── POST handler ──────────────────────────────────────────────────────
@@ -179,15 +202,18 @@ export async function POST(request: NextRequest) {
 
   // Build the user message from payload
   let userMessage: string;
+  let systemContent: string;
   if (action === "script") {
     const p = payload as { role?: string; context?: string };
-    // Inject role/context into the system prompt
-    const prompt = SYSTEM_PROMPTS.script
+    systemContent = SYSTEM_PROMPTS.script
       .replace("{{ROLE}}", p.role || "presenter")
       .replace("{{CONTEXT}}", p.context || "general presentation");
     userMessage = `Generate a speaking script now. Context: ${p.context || "general"}`;
-    // Use modified prompt as system
-    var systemContent = prompt;
+  } else if (action === "rewrite") {
+    const p = payload as { text?: string; style?: string };
+    const style = p.style || "casual";
+    systemContent = SYSTEM_PROMPTS.rewrite.replace(/\{\{STYLE\}\}/g, style);
+    userMessage = p.text || "";
   } else {
     systemContent = SYSTEM_PROMPTS[action];
     userMessage = JSON.stringify(payload);
@@ -208,8 +234,8 @@ export async function POST(request: NextRequest) {
           { role: "system", content: systemContent },
           { role: "user", content: userMessage },
         ],
-        temperature: action === "humanize" ? 0.85 : action === "script" ? 0.7 : 0.4,
-        max_tokens: action === "humanize" ? 4096 : action === "script" ? 3000 : 2048,
+        temperature: action === "humanize" ? 0.85 : action === "script" ? 0.7 : action === "rewrite" ? 0.75 : 0.4,
+        max_tokens: (action === "humanize" || action === "rewrite") ? 4096 : action === "script" ? 3000 : 2048,
       }),
     });
 
