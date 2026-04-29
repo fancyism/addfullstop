@@ -261,15 +261,15 @@ function scoreToneForText(text: string, words: string[], sentences: string[]): T
   const avgSentLen = words.length / sentenceCount;
   if (avgSentLen > 20) formal += 8;
   if (avgSentLen > 30) formal += 8;
-  // No contractions → formal
+  // No contractions → formal (but only if text is long enough to expect them)
   const contractionCount = countPattern(text, /\b\w+'\w+\b/g);
-  formal += Math.max(0, 10 - contractionCount * 3);
-  // No exclamation marks → formal
+  if (wordCount > 20) formal += Math.max(0, 6 - contractionCount * 3);
+  // No exclamation marks → formal (but weak signal, capped)
   const exclCount = countPattern(text, /!/g);
-  formal += Math.max(0, 8 - exclCount * 4);
-  // No first person → formal
+  if (wordCount > 20) formal += Math.max(0, 4 - exclCount * 2);
+  // No first person → formal (weak signal)
   const firstPerson = countPattern(text, /\b(I|we|me|my|us|our)\b/gi);
-  formal += Math.max(0, 10 - firstPerson * 2);
+  if (wordCount > 20) formal += Math.max(0, 5 - firstPerson * 2);
 
   // ── Casual signals ──
   let casual = 0;
@@ -287,6 +287,13 @@ function scoreToneForText(text: string, words: string[], sentences: string[]): T
   // Second person
   const secondPerson = countPattern(text, /\b(you|your|yours)\b/gi);
   casual += secondPerson * 3;
+  // Profanity / slang / extreme informality → very strong casual signal
+  casual += countPattern(text, /\b(bro|dude|man|dawg|homie|yooo|lmao|wtf|stfu|af|nvm|idk|smh|ngl|fr|cap|nocap|bruh)\b/gi) * 12;
+  casual += countPattern(text, /\b(fuck|shit|damn|ass|dick|bitch|crap|hell|bastard|wtf|stfu)\b/gi) * 15;
+  casual += countPattern(text, /\b(mtfuck|motherfuck|holyshit|crazy)\b/gi) * 12;
+  // Repeated informal address words (bro, dude, man)
+  const informalAddress = countPattern(text, /\bbro\b/gi);
+  casual += informalAddress * 5;
 
   // ── Persuasive signals ──
   let persuasive = 0;
@@ -428,9 +435,12 @@ export function analyzeTone(text: string): ToneResult | null {
   // Score the full text
   const rawScores = scoreToneForText(trimmed, words, sentences);
 
-  // Normalize scores to 0-100
-  const maxPossible = Math.max(...Object.values(rawScores), 30);
-  const normalize = (raw: number) => Math.min(100, Math.round((raw / maxPossible) * 100));
+  // Normalize scores to 0-100 using absolute scale (not relative to each other)
+  // This prevents all tones from inflating to ~100 when signals are weak
+  const normalize = (raw: number) => {
+    // Absolute scale: 50 raw points = 100%. Clamped to 0-100.
+    return Math.min(100, Math.round((raw / 50) * 100));
+  };
 
   const tones: ToneScore[] = (Object.keys(rawScores) as ToneType[])
     .map((tone) => ({
@@ -440,8 +450,10 @@ export function analyzeTone(text: string): ToneResult | null {
     }))
     .sort((a, b) => b.score - a.score);
 
-  // Boost the top tone slightly for clarity
-  if (tones[0]) tones[0].score = Math.min(100, tones[0].score + 5);
+  // Ensure primary tone has at least a minimum score to be meaningful
+  if (tones[0] && tones[0].score < 15 && rawScores[tones[0].tone] > 0) {
+    tones[0].score = Math.min(100, tones[0].score + 10);
+  }
 
   const primary = tones[0];
   const secondary = tones[1]?.score > 25 ? tones[1].tone : null;
