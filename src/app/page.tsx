@@ -15,6 +15,8 @@ import { analyzeTone, TONE_META } from "@/lib/toneAnalyzer";
 import type { ToneResult } from "@/lib/toneAnalyzer";
 import { generateScript, SCRIPT_ROLES } from "@/lib/scriptGenerator";
 import type { ScriptRole, GeneratedScript } from "@/lib/scriptGenerator";
+import { aiClient } from "@/lib/aiClient";
+import type { AISource } from "@/lib/aiClient";
 import { AdBanner } from "@/components/AdBanner";
 
 // ─── Clipboard with fallback ──────────────────────────────────────────
@@ -46,6 +48,10 @@ type Tab = "fix" | "analyze" | "readability" | "tone" | "script";
 export default function Home() {
   // Tab
   const [activeTab, setActiveTab] = useState<Tab>("fix");
+
+  // AI status
+  const [aiSource, setAiSource] = useState<AISource>("heuristic");
+  const [aiChecking, setAiChecking] = useState(false);
 
   // Fix Text state
   const [input, setInput] = useState("");
@@ -181,15 +187,19 @@ export default function Home() {
 
   // ─── AI Analyzer logic ────────────────────────────────────────────
 
-  const runAnalysis = useCallback((text: string) => {
+  const runAnalysis = useCallback(async (text: string) => {
     if (!text.trim()) return;
     setAnalyzerError(null);
+    setAiChecking(true);
     try {
-      const result = analyzeText(text);
-      setAnalysisResult(result);
+      const { source, score } = await aiClient.analyze(text);
+      setAiSource(source);
+      setAnalysisResult(score);
     } catch (err) {
       setAnalyzerError("Analysis failed — something went wrong. Try shorter or different text.");
       console.error("analyzeText error:", err);
+    } finally {
+      setAiChecking(false);
     }
   }, []);
 
@@ -232,20 +242,24 @@ export default function Home() {
 
   // ─── Humanizer logic ─────────────────────────────────────────────
 
-  const handleHumanize = useCallback(() => {
+  const handleHumanize = useCallback(async () => {
     if (!analyzerInput.trim()) return;
     setAnalyzerError(null);
+    setAiChecking(true);
     try {
-      const result = humanizeText(analyzerInput);
+      const { source, result } = await aiClient.humanize(analyzerInput);
+      setAiSource(source);
       setHumanizeResult(result);
+      // Re-analyze the humanized text (heuristic for speed)
       const score = analyzeText(result.text);
       setHumanizedScore(score);
-      // Reset platform when re-humanizing
       setSelectedPlatform(null);
       setPlatformResult(null);
     } catch (err) {
       setAnalyzerError("Humanization failed — try different text.");
       console.error("humanizeText error:", err);
+    } finally {
+      setAiChecking(false);
     }
   }, [analyzerInput]);
 
@@ -363,14 +377,18 @@ export default function Home() {
 
   // ─── Tone Detector logic ───────────────────────────────────────────
 
-  const runToneAnalysis = useCallback((text: string) => {
+  const runToneAnalysis = useCallback(async (text: string) => {
     try {
       setToneError(null);
-      const result = analyzeTone(text);
+      setAiChecking(true);
+      const { source, result } = await aiClient.tone(text);
+      setAiSource(source);
       setToneResult(result);
     } catch (err) {
       setToneError("Tone analysis failed — try different text.");
       console.error("analyzeTone error:", err);
+    } finally {
+      setAiChecking(false);
     }
   }, []);
 
@@ -407,9 +425,15 @@ export default function Home() {
 
   // ─── Script Generator logic ─────────────────────────────────────────
 
-  const handleGenerateScript = useCallback(() => {
-    const result = generateScript(scriptRole, scriptContext);
-    setScriptResult(result);
+  const handleGenerateScript = useCallback(async () => {
+    setAiChecking(true);
+    try {
+      const { source, result } = await aiClient.script(scriptRole, scriptContext);
+      setAiSource(source);
+      setScriptResult(result);
+    } finally {
+      setAiChecking(false);
+    }
   }, [scriptRole, scriptContext]);
 
   const handleCopyScript = useCallback(async () => {
@@ -536,6 +560,24 @@ export default function Home() {
         </div>
 
         {/* Tab bar */}
+        <div className="mb-2 flex justify-center">
+          {aiChecking ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-500/15 px-3 py-1 text-[11px] font-medium text-violet-600 dark:text-violet-400">
+              <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25"/><path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" className="opacity-75"/></svg>
+              AI processing...
+            </span>
+          ) : aiSource === "ai" ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              AI-powered
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[11px] font-medium opacity-40">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+              Heuristic mode (no API key)
+            </span>
+          )}
+        </div>
         <div className="mb-6 flex justify-center">
           <div className="glass-subtle inline-flex rounded-xl p-1">
             <button
@@ -808,9 +850,10 @@ export default function Home() {
                     </button>
                     <button
                       onClick={handleHumanize}
-                      className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                      disabled={aiChecking}
+                      className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50"
                     >
-                      ✨ Humanize This Text
+                      {aiChecking ? "Humanizing with AI..." : "✨ Humanize This Text"}
                     </button>
                     <button
                       onClick={() => window.print()}
@@ -1473,10 +1516,10 @@ export default function Home() {
             {/* Generate Button */}
             <button
               onClick={handleGenerateScript}
-              disabled={scriptContext.trim().length < 5}
+              disabled={scriptContext.trim().length < 5 || aiChecking}
               className="mb-6 w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-violet-500/25 transition hover:shadow-xl disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Generate Script
+              {aiChecking ? "Generating with AI..." : "Generate Script"}
             </button>
 
             {/* Result */}
