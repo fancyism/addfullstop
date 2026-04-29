@@ -11,6 +11,8 @@ import { formatForPlatform, PLATFORM_META } from "@/lib/platformFormatter";
 import type { Platform, PlatformFormatResult } from "@/lib/platformFormatter";
 import { analyzeReadability } from "@/lib/readabilityAnalyzer";
 import type { ReadabilityResult } from "@/lib/readabilityAnalyzer";
+import { analyzeTone, TONE_META } from "@/lib/toneAnalyzer";
+import type { ToneResult } from "@/lib/toneAnalyzer";
 import { AdBanner } from "@/components/AdBanner";
 
 // ─── Clipboard with fallback ──────────────────────────────────────────
@@ -37,7 +39,7 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-type Tab = "fix" | "analyze" | "readability";
+type Tab = "fix" | "analyze" | "readability" | "tone";
 
 export default function Home() {
   // Tab
@@ -78,6 +80,14 @@ export default function Home() {
   const [readabilityCopied, setReadabilityCopied] = useState(false);
   const readabilityTextareaRef = useRef<HTMLTextAreaElement>(null);
   const readabilityDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Tone Detector state
+  const [toneInput, setToneInput] = useState("");
+  const [toneResult, setToneResult] = useState<ToneResult | null>(null);
+  const [toneError, setToneError] = useState<string | null>(null);
+  const [toneCopied, setToneCopied] = useState(false);
+  const toneTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const toneDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ─── Fix Text logic ───────────────────────────────────────────────
 
@@ -343,6 +353,58 @@ export default function Home() {
     if (ok) { setReadabilityCopied(true); setTimeout(() => setReadabilityCopied(false), 2000); }
   }, [readabilityResult]);
 
+  // ─── Tone Detector logic ───────────────────────────────────────────
+
+  const runToneAnalysis = useCallback((text: string) => {
+    try {
+      setToneError(null);
+      const result = analyzeTone(text);
+      setToneResult(result);
+    } catch (err) {
+      setToneError("Tone analysis failed — try different text.");
+      console.error("analyzeTone error:", err);
+    }
+  }, []);
+
+  const handleToneInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setToneInput(e.target.value);
+    if (toneDebounceRef.current) clearTimeout(toneDebounceRef.current);
+    toneDebounceRef.current = setTimeout(() => {
+      const val = e.target.value.trim();
+      if (val.length >= 20) runToneAnalysis(val);
+    }, 300);
+  }, [runToneAnalysis]);
+
+  const handleTonePaste = useCallback(() => {
+    requestAnimationFrame(() => {
+      const pastedText = toneTextareaRef.current?.value ?? "";
+      if (pastedText.trim()) runToneAnalysis(pastedText);
+    });
+  }, [runToneAnalysis]);
+
+  const handleToneClear = useCallback(() => {
+    setToneInput("");
+    setToneResult(null);
+    setToneError(null);
+    if (toneDebounceRef.current) clearTimeout(toneDebounceRef.current);
+  }, []);
+
+  const handleCopyTone = useCallback(async () => {
+    if (!toneResult) return;
+    const lines = toneResult.tones.slice(0, 4).map((t) => `${t.emoji} ${t.label}: ${t.score}%`);
+    const summary = `🎭 Tone Analysis\n${lines.join("\n")}\nIntensity: ${toneResult.emotionalIntensity}%\nWords: ${toneResult.stats.wordCount} | Sentences: ${toneResult.stats.sentenceCount}\nAnalyzed on AddFullStop`;
+    const ok = await copyToClipboard(summary);
+    if (ok) { setToneCopied(true); setTimeout(() => setToneCopied(false), 2000); }
+  }, [toneResult]);
+
+  // ─── Check icon helper ─────────────────────────────────────────────
+
+  const CheckIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0 text-green-500">
+      <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
+    </svg>
+  );
+
   // ─── Score ring SVG ───────────────────────────────────────────────
 
   const scoreColor = analysisResult?.color ?? "green";
@@ -387,7 +449,7 @@ export default function Home() {
             Clean Up ChatGPT Text
           </h1>
           <p className="mx-auto mt-3 max-w-xl text-base">
-            Fix trailing spaces, add periods, remove emojis — or check if your text sounds AI-generated.
+            Fix trailing spaces, add periods, remove emojis — check if text sounds AI-generated or analyze its tone.
             All processing happens in your browser.
           </p>
         </div>
@@ -424,6 +486,16 @@ export default function Home() {
               }`}
             >
               📊 Readability
+            </button>
+            <button
+              onClick={() => setActiveTab("tone")}
+              className={`rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
+                activeTab === "tone"
+                  ? "bg-white/60 font-semibold shadow-sm backdrop-blur-sm"
+                  : "opacity-60 hover:opacity-100"
+              }`}
+            >
+              🎭 Tone
             </button>
           </div>
         </div>
@@ -1085,6 +1157,182 @@ export default function Home() {
                   </div>
                 )}
               </>
+            )}
+          </div>
+        )}
+
+        {/* ═══════════════ TONE DETECTOR TAB ═══════════════ */}
+        {activeTab === "tone" && (
+          <div className="glass rounded-2xl p-4 sm:p-6">
+            {/* Input */}
+            <div className="mb-4">
+              <label htmlFor="tone-input" className="text-xs font-medium uppercase tracking-wide opacity-60">
+                Paste text to analyze tone
+              </label>
+              <button onClick={handleToneClear} className="ml-2 rounded-md border border-white/20 bg-white/20 px-3 py-1 text-xs font-medium backdrop-blur-sm transition hover:bg-white/40">
+                Clear
+              </button>
+            </div>
+            <textarea
+              id="tone-input"
+              ref={toneTextareaRef}
+              value={toneInput}
+              onChange={handleToneInputChange}
+              onPaste={handleTonePaste}
+              placeholder="Paste any text here to detect its tone — formal, casual, persuasive, friendly, urgent, analytical, or empathetic..."
+              rows={5}
+              className="w-full resize-y rounded-lg border border-white/30 bg-white/40 p-4 text-sm leading-relaxed outline-none backdrop-blur-sm transition focus:border-violet-400 focus:ring-2 focus:ring-violet-400/20"
+            />
+            <div className="mt-1 flex items-center justify-between">
+              <span className={`text-[11px] ${
+                toneInput.length === 0 ? "opacity-40"
+                  : toneInput.length < 20 ? "text-yellow-500"
+                  : toneInput.length > 50000 ? "text-red-500"
+                  : "opacity-40"
+              }`}>
+                {toneInput.length === 0 ? ""
+                  : toneInput.length < 20 ? `⚠️ ${toneInput.length}/20 min chars`
+                  : `${toneInput.length.toLocaleString()} characters`}
+                {toneInput.length > 50000 && " — very long text"}
+              </span>
+            </div>
+
+            {/* Auto-analyze on paste */}
+            {toneInput.length >= 20 && !toneResult && !toneError && (
+              <p className="mt-2 text-center text-xs opacity-50">Analyzing tone...</p>
+            )}
+
+            {toneError && (
+              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-400">
+                {toneError}
+              </div>
+            )}
+
+            {/* Results */}
+            {toneResult && (
+              <>
+                {/* Primary Tone Score Circle */}
+                <div className="glass animate-pulse-once rounded-2xl p-6 text-center">
+                  <div className="mb-2 text-xs font-bold uppercase tracking-widest opacity-50">Primary Tone</div>
+                  <div className="text-5xl mb-2">{toneResult.primary.emoji}</div>
+                  <div className="text-2xl font-bold" style={{ color: toneResult.primary.color }}>
+                    {toneResult.primary.label}
+                  </div>
+                  <div className="mt-1 text-sm opacity-60">{toneResult.primary.description}</div>
+                  <div className="mt-3 text-3xl font-bold" style={{ color: toneResult.primary.color }}>
+                    {toneResult.primary.score}%
+                  </div>
+
+                  {/* Emotional Intensity Bar */}
+                  <div className="mt-4">
+                    <div className="mb-1 text-[10px] uppercase tracking-wide opacity-50">Emotional Intensity</div>
+                    <div className="mx-auto h-2 max-w-xs overflow-hidden rounded-full bg-black/5 dark:bg-white/10">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500 transition-all duration-700"
+                        style={{ width: `${toneResult.emotionalIntensity}%` }}
+                      />
+                    </div>
+                    <div className="mt-1 text-xs opacity-50">{toneResult.emotionalIntensity}%</div>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="mt-4 flex flex-wrap justify-center gap-2">
+                    <button onClick={handleCopyTone} className="rounded-lg border border-white/20 bg-white/20 px-4 py-2 text-xs font-semibold backdrop-blur-sm transition hover:bg-white/40">
+                      {toneCopied ? "✓ Copied!" : "📋 Copy Report"}
+                    </button>
+                    <button onClick={() => { const w = window.print(); }} className="rounded-lg border border-white/20 bg-white/20 px-4 py-2 text-xs font-semibold backdrop-blur-sm transition hover:bg-white/40 no-print">
+                      📄 Export PDF
+                    </button>
+                  </div>
+                </div>
+
+                {/* All Tones Breakdown */}
+                <div className="glass animate-fade-in-up rounded-2xl p-5">
+                  <h3 className="mb-3 text-sm font-bold">All Tones Breakdown</h3>
+                  <div className="space-y-3">
+                    {toneResult.tones.map((t) => (
+                      <div key={t.tone}>
+                        <div className="mb-1 flex items-center justify-between">
+                          <span className="flex items-center gap-2 text-sm font-medium">
+                            <span>{t.emoji}</span>
+                            <span>{t.label}</span>
+                          </span>
+                          <span className="text-sm font-bold" style={{ color: t.score > 40 ? t.color : undefined }}>{t.score}%</span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-black/5 dark:bg-white/10">
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{ width: `${t.score}%`, backgroundColor: t.color, opacity: t.score > 30 ? 1 : 0.4 }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Stats Grid */}
+                <div className="glass animate-fade-in-up rounded-2xl p-5">
+                  <h3 className="mb-3 text-sm font-bold">Text Statistics</h3>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    {[
+                      { label: "Words", value: toneResult.stats.wordCount },
+                      { label: "Sentences", value: toneResult.stats.sentenceCount },
+                      { label: "Avg Length", value: `${toneResult.stats.avgSentenceLength}w` },
+                      { label: "Questions", value: toneResult.stats.questionCount },
+                      { label: "Exclamations", value: toneResult.stats.exclamationCount },
+                      { label: "I/We (1st)", value: toneResult.stats.firstPersonCount },
+                      { label: "You (2nd)", value: toneResult.stats.secondPersonCount },
+                      { label: "Passive", value: toneResult.stats.passiveVoiceCount },
+                    ].map((stat) => (
+                      <div key={stat.label} className="glass-subtle rounded-lg p-3 text-center">
+                        <span className="block text-lg font-bold">{stat.value}</span>
+                        <span className="text-[10px] opacity-50">{stat.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Sentence-by-Sentence Analysis */}
+                {toneResult.sentenceTones.length > 1 && (
+                  <div className="glass animate-fade-in-up rounded-2xl p-5">
+                    <h3 className="mb-3 text-sm font-bold">Sentence-by-Sentence</h3>
+                    <div className="max-h-64 space-y-2 overflow-y-auto">
+                      {toneResult.sentenceTones.map((st) => (
+                        <div key={st.index} className="flex items-start gap-2 rounded-lg bg-white/10 px-3 py-2 text-xs">
+                          <span className="shrink-0 font-mono opacity-40">{st.index}.</span>
+                          <span className="flex-1 opacity-80">{st.text}</span>
+                          <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: TONE_META[st.tone].color + "20", color: TONE_META[st.tone].color }}>
+                            {TONE_META[st.tone].emoji} {TONE_META[st.tone].label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Tips */}
+                {toneResult.tips.length > 0 && (
+                  <div className="glass animate-fade-in-up rounded-2xl p-5">
+                    <h3 className="mb-3 text-sm font-bold">Tips</h3>
+                    <ul className="space-y-2">
+                      {toneResult.tips.map((tip, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm opacity-80">
+                          <CheckIcon />
+                          <span>{tip}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
+            )}
+
+            {toneInput.length < 20 && (
+              <div className="glass animate-pulse-once rounded-2xl p-6 text-center">
+                <div className="text-4xl mb-3">🎭</div>
+                <div className="text-sm font-bold">Paste at least 20 characters to analyze tone</div>
+                <div className="mt-1 text-xs opacity-50">We detect 7 tones: Formal, Casual, Persuasive, Friendly, Urgent, Analytical, Empathetic</div>
+              </div>
             )}
           </div>
         )}
