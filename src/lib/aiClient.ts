@@ -1,10 +1,11 @@
 /**
- * AI Client — Unified interface for all AI-powered features.
+ * AI Client — LLM-first interface for all AI-powered features.
  *
- * Strategy: Try OpenRouter API first → fall back to heuristic if unavailable.
- * The API key stays server-side (never sent to client).
+ * When AI is available: LLM does the real analysis, heuristics only provide stats.
+ * When AI is unavailable: heuristic fallback keeps the app working.
  *
  * Usage:
+ *   aiClient.setModel("thudm/glm-5.1");
  *   const result = await aiClient.analyze(text);
  *   result.source // "ai" | "heuristic"
  */
@@ -14,7 +15,8 @@ import type { AIScore } from "./aiAnalyzer";
 import { humanizeText } from "./humanizer";
 import type { HumanizeResult } from "./humanizer";
 import { analyzeTone } from "./toneAnalyzer";
-import type { ToneResult } from "./toneAnalyzer";
+import type { ToneResult, ToneType } from "./toneAnalyzer";
+import { TONE_META } from "./toneAnalyzer";
 import { generateScript } from "./scriptGenerator";
 import type { ScriptRole, GeneratedScript } from "./scriptGenerator";
 
@@ -42,19 +44,48 @@ export interface AIScriptResult {
   result: GeneratedScript | null;
 }
 
-export interface AIStatus {
-  available: boolean;
-  model: string | null;
+export interface ModelInfo {
+  id: string;
+  label: string;
+  provider: string;
+  tier: string;
 }
 
-// ─── API call helper ───────────────────────────────────────────────────
+// ─── Model Management ─────────────────────────────────────────────────
 
-async function callAI(action: string, payload: unknown): Promise<{ ok: boolean; data?: unknown; source: AISource }> {
+let currentModel = "thudm/glm-5.1";
+let cachedModels: ModelInfo[] = [];
+
+export function getModel(): string {
+  return currentModel;
+}
+
+export function setModel(model: string): void {
+  currentModel = model;
+}
+
+export function getAvailableModels(): ModelInfo[] {
+  return cachedModels.length > 0 ? cachedModels : [
+    { id: "thudm/glm-5.1", label: "GLM-5.1", provider: "Zhipu AI", tier: "smart" },
+    { id: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", provider: "Google", tier: "fast" },
+    { id: "openai/gpt-4o", label: "GPT-4o", provider: "OpenAI", tier: "smart" },
+    { id: "anthropic/claude-sonnet-4", label: "Claude Sonnet 4", provider: "Anthropic", tier: "smart" },
+  ];
+}
+
+// ─── API Call ──────────────────────────────────────────────────────────
+
+async function callAI(action: string, payload: unknown): Promise<{
+  ok: boolean;
+  data?: unknown;
+  source: AISource;
+  model?: string;
+}> {
   try {
     const res = await fetch("/api/ai", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, payload }),
+      body: JSON.stringify({ action, payload, model: currentModel }),
     });
 
     const json = await res.json();
@@ -63,77 +94,75 @@ async function callAI(action: string, payload: unknown): Promise<{ ok: boolean; 
       return { ok: false, source: "heuristic" };
     }
 
-    return { ok: true, data: json.result, source: "ai" };
+    // Cache models from server if provided
+    if (json.models) {
+      cachedModels = json.models;
+    }
+
+    return { ok: true, data: json.result, source: "ai", model: json.model };
   } catch {
     return { ok: false, source: "heuristic" };
+  }
+}
+
+// ─── Fetch available models from server ────────────────────────────────
+
+export async function fetchModels(): Promise<{ models: ModelInfo[]; configured: boolean }> {
+  try {
+    const res = await fetch("/api/ai");
+    const json = await res.json();
+    if (json.models) {
+      cachedModels = json.models;
+      return { models: json.models, configured: json.configured };
+    }
+    return { models: getAvailableModels(), configured: false };
+  } catch {
+    return { models: getAvailableModels(), configured: false };
   }
 }
 
 // ─── Public API ────────────────────────────────────────────────────────
 
 export const aiClient = {
-  /**
-   * Check if AI is available (has API key configured).
-   */
-  async getStatus(): Promise<AIStatus> {
-    try {
-      const res = await fetch("/api/ai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "analyze", payload: { text: "test" } }),
-      });
-      const json = await res.json();
-      return { available: json.aiAvailable === true, model: json.aiAvailable ? "openrouter" : null };
-    } catch {
-      return { available: false, model: null };
-    }
-  },
+  getModel,
+  setModel,
+  fetchModels,
 
   /**
-   * AI-powered text analysis (AI detection).
-   * Falls back to heuristic analysis.
+   * AI-powered text analysis — LLM is the brain.
+   * Heuristic only provides stats (word count, sentence count, etc).
    */
   async analyze(text: string): Promise<AIAnalyzeResult> {
     const { ok, data, source } = await callAI("analyze", { text });
+    const heuristic = analyzeText(text);
 
     if (ok && data && typeof data === "object") {
-      const aiData = data as Record<string, unknown>;
-      // Merge AI scores with heuristic stats (AI doesn't compute word stats)
-      const heuristic = analyzeText(text);
+      const ai = data as Record<string, unknown>;
 
-      // Build the merged result — AI metrics take priority
+      // AI provides the scores, heuristic provides stats only
+      const overall = typeof ai.overall === "number" ? ai.overall : heuristic.overall;
+
       const score: AIScore = {
-        overall: typeof aiData.overall === "number" ? aiData.overall : heuristic.overall,
-        label: heuristic.label,
-        color: heuristic.color,
+        overall,
+        label: overall < 25 ? "Likely Human" : overall < 50 ? "Possibly AI" : "Likely AI",
+        color: overall < 25 ? "green" : overall < 50 ? "yellow" : "red",
         warnings: heuristic.warnings,
-        metrics: heuristic.metrics, // Keep heuristic metrics as baseline
-        lineScores: Array.isArray(aiData.lineScores)
-          ? (aiData.lineScores as Array<{ line: number; text: string; score: number; reason: string }>).slice(0, 50)
+        metrics: heuristic.metrics,
+        lineScores: Array.isArray(ai.lineScores)
+          ? (ai.lineScores as AIScore["lineScores"]).slice(0, 50)
           : heuristic.lineScores,
-        tips: Array.isArray(aiData.tips) ? (aiData.tips as string[]).slice(0, 10) : heuristic.tips,
+        tips: Array.isArray(ai.tips) ? (ai.tips as string[]).slice(0, 10) : heuristic.tips,
         stats: heuristic.stats,
       };
 
-      // Recalculate label/color from AI overall score
-      if (score.overall < 25) {
-        score.label = "Likely Human";
-        score.color = "green";
-      } else if (score.overall < 50) {
-        score.label = "Possibly AI";
-        score.color = "yellow";
-      } else {
-        score.label = "Likely AI";
-        score.color = "red";
-      }
-
-      // If AI returned metrics, override the heuristic ones
-      if (aiData.metrics && typeof aiData.metrics === "object") {
-        const aiMetrics = aiData.metrics as Record<string, unknown>;
+      // AI metrics override heuristic
+      if (ai.metrics && typeof ai.metrics === "object") {
+        const aiMetrics = ai.metrics as Record<string, unknown>;
         for (const key of Object.keys(aiMetrics)) {
           if (key in score.metrics && typeof aiMetrics[key] === "number") {
-            (score.metrics as Record<string, { score: number; label: string; description: string }>)[key] = {
-              ...score.metrics[key as keyof typeof score.metrics],
+            const entry = score.metrics[key as keyof typeof score.metrics];
+            (score.metrics as Record<string, typeof entry>)[key] = {
+              ...entry,
               score: aiMetrics[key] as number,
             };
           }
@@ -143,133 +172,136 @@ export const aiClient = {
       return { source, score };
     }
 
-    // Fallback to heuristic
-    return { source: "heuristic", score: analyzeText(text) };
+    return { source: "heuristic", score: heuristic };
   },
 
   /**
-   * AI-powered text humanization.
-   * Falls back to rule-based humanizer.
+   * AI-powered humanization — LLM rewrites the text.
    */
   async humanize(text: string): Promise<AIHumanizeResult> {
     const { ok, data, source } = await callAI("humanize", { text });
 
     if (ok && data && typeof data === "string") {
-      // AI returned humanized text — compute diff-like changes
-      const changes = computeChanges(text, data as string);
+      const humanizedText = data as string;
+      const changes = computeChanges(text, humanizedText);
       return {
         source,
-        result: {
-          text: data as string,
-          changes,
-          totalChanges: changes.length,
-        },
+        result: { text: humanizedText, changes, totalChanges: changes.length },
       };
     }
 
-    // Fallback to rule-based
     return { source: "heuristic", result: humanizeText(text) };
   },
 
   /**
-   * AI-powered tone analysis.
-   * Falls back to heuristic tone detector.
+   * AI-powered tone analysis — LLM reads the tone.
+   * Heuristic only provides stats.
    */
   async tone(text: string): Promise<AIToneResult> {
     const { ok, data, source } = await callAI("tone", { text });
+    const heuristic = analyzeTone(text);
 
     if (ok && data && typeof data === "object") {
-      const heuristic = analyzeTone(text);
-      if (!heuristic) {
-        return { source: "heuristic", result: analyzeTone(text) ?? getDefaultToneResult() };
-      }
-      const aiData = data as Record<string, unknown>;
+      const ai = data as Record<string, unknown>;
+      const stats = heuristic ? heuristic.stats : getDefaultStats(text);
 
-      // Clone heuristic as base (satisfies ToneResult fully)
+      // Build ToneResult from AI response directly
+      const tones = buildToneScores(ai);
+      const sentenceTones = buildSentenceTones(ai, text);
+
       const result: ToneResult = {
-        tones: [...heuristic.tones],
-        primary: { ...heuristic.primary },
-        emotionalIntensity: heuristic.emotionalIntensity,
-        tips: [...heuristic.tips],
-        sentenceTones: [...heuristic.sentenceTones],
-        stats: { ...heuristic.stats },
+        tones,
+        primary: tones[0] || getDefaultToneScore(),
+        emotionalIntensity: typeof ai.emotionalIntensity === "number" ? ai.emotionalIntensity : 50,
+        tips: Array.isArray(ai.tips) ? (ai.tips as string[]).slice(0, 5) : [],
+        sentenceTones,
+        stats,
       };
-
-      if (typeof aiData.emotionalIntensity === "number") {
-        result.emotionalIntensity = aiData.emotionalIntensity;
-      }
-
-      if (Array.isArray(aiData.tips)) {
-        result.tips = aiData.tips as string[];
-      }
-
-      // Merge AI tone scores into the heuristic result
-      if (Array.isArray(aiData.tones)) {
-        const aiTones = aiData.tones as Array<{ tone: string; score: number; reason: string }>;
-        // Boost heuristic scores with AI confidence where available
-        for (const at of aiTones) {
-          const existing = result.tones.find(t => t.tone === at.tone);
-          if (existing) {
-            // Blend: 60% AI, 40% heuristic
-            existing.score = Math.round(existing.score * 0.4 + at.score * 0.6);
-          }
-        }
-        // Re-sort and re-pick primary
-        result.tones.sort((a, b) => b.score - a.score);
-        result.primary = result.tones[0];
-      }
-
-      if (Array.isArray(aiData.sentenceTones)) {
-        const aiST = aiData.sentenceTones as Array<{ index: number; tone: string; confidence: number }>;
-        for (const st of aiST) {
-          const existing = result.sentenceTones.find(s => s.index === st.index);
-          if (existing) {
-            existing.tone = st.tone as ToneResult["primary"]["tone"];
-            existing.confidence = st.confidence;
-          }
-        }
-      }
 
       return { source, result };
     }
 
-    return { source: "heuristic", result: analyzeTone(text) ?? getDefaultToneResult() };
+    return { source: "heuristic", result: heuristic ?? getDefaultToneResult(text) };
   },
 
   /**
-   * AI-powered script generation.
-   * Falls back to template-based generator.
+   * AI-powered script generation — LLM writes the script.
    */
   async script(role: ScriptRole, context: string): Promise<AIScriptResult> {
     const { ok, data, source } = await callAI("script", { role, context });
 
     if (ok && data && typeof data === "object") {
-      const aiData = data as Record<string, unknown>;
+      const ai = data as Record<string, unknown>;
+      const dd = ai.dosAndDonts as Record<string, string[]> | undefined;
+
       const result: GeneratedScript = {
         role,
         context,
-        sections: Array.isArray(aiData.sections)
-          ? (aiData.sections as Array<{ title: string; icon: string; content: string; bullets?: string[] }>)
+        sections: Array.isArray(ai.sections)
+          ? (ai.sections as GeneratedScript["sections"])
           : [],
-        preparation: Array.isArray(aiData.preparation) ? (aiData.preparation as string[]) : [],
+        preparation: Array.isArray(ai.preparation) ? (ai.preparation as string[]) : [],
         dosAndDonts: {
-          dos: Array.isArray((aiData.dosAndDonts as Record<string, string[]>)?.dos) ? ((aiData.dosAndDonts as Record<string, string[]>).dos) : [],
-          donts: Array.isArray((aiData.dosAndDonts as Record<string, string[]>)?.donts) ? ((aiData.dosAndDonts as Record<string, string[]>).donts) : [],
+          dos: Array.isArray(dd?.dos) ? dd!.dos : [],
+          donts: Array.isArray(dd?.donts) ? dd!.donts : [],
         },
-        keyPhrases: Array.isArray(aiData.keyPhrases) ? (aiData.keyPhrases as string[]) : [],
-        duration: typeof aiData.duration === "string" ? aiData.duration : "5-10 minutes",
+        keyPhrases: Array.isArray(ai.keyPhrases) ? (ai.keyPhrases as string[]) : [],
+        duration: typeof ai.duration === "string" ? ai.duration : "5-10 minutes",
       };
       return { source, result };
     }
 
-    // Fallback to template-based
     return { source: "heuristic", result: generateScript(role, context) };
   },
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────
 
-/** Compute change descriptions between original and humanized text */
+function buildToneScores(ai: Record<string, unknown>): ToneResult["tones"] {
+  if (!Array.isArray(ai.tones)) return [];
+
+  return (ai.tones as Array<{ tone: string; score: number; reason: string }>)
+    .filter(t => t.tone in TONE_META)
+    .map(t => {
+      const meta = TONE_META[t.tone as ToneType];
+      return {
+        tone: t.tone as ToneType,
+        score: Math.min(100, Math.max(0, t.score)),
+        label: meta.label,
+        emoji: meta.emoji,
+        description: meta.description,
+        color: meta.color,
+      };
+    })
+    .sort((a, b) => b.score - a.score);
+}
+
+function buildSentenceTones(ai: Record<string, unknown>, text: string): ToneResult["sentenceTones"] {
+  const sentences = text.split(/(?<=[.!?。？！])\s+/).filter(s => s.trim().length > 0);
+
+  if (!Array.isArray(ai.sentenceTones)) {
+    // Build basic sentence tones from text
+    return sentences.slice(0, 30).map((s, i) => ({
+      index: i + 1,
+      text: s.length > 120 ? s.slice(0, 117) + "..." : s,
+      tone: "casual" as ToneType,
+      confidence: 50,
+    }));
+  }
+
+  return (ai.sentenceTones as Array<{ index: number; tone: string; confidence: number }>)
+    .filter(st => st.tone in TONE_META)
+    .map((st, i) => {
+      const sentence = sentences[i] || sentences[sentences.length - 1] || "";
+      return {
+        index: st.index + 1,
+        text: sentence.length > 120 ? sentence.slice(0, 117) + "..." : sentence,
+        tone: st.tone as ToneType,
+        confidence: Math.min(100, Math.max(0, st.confidence)),
+      };
+    });
+}
+
 function computeChanges(original: string, humanized: string): HumanizeResult["changes"] {
   const changes: HumanizeResult["changes"] = [];
   const origLines = original.split("\n");
@@ -290,17 +322,35 @@ function computeChanges(original: string, humanized: string): HumanizeResult["ch
     }
   }
 
-  return changes.slice(0, 20); // Cap at 20 changes
+  return changes.slice(0, 20);
 }
 
-/** Minimal fallback ToneResult when both AI and heuristic fail */
-function getDefaultToneResult(): ToneResult {
+function getDefaultToneScore(): ToneResult["primary"] {
+  return { tone: "casual", score: 0, label: "Casual", emoji: "💬", description: "Default", color: "#6b7280" };
+}
+
+function getDefaultStats(text: string): ToneResult["stats"] {
+  const words = text.split(/\s+/).filter(w => w.length > 0);
+  const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+  return {
+    wordCount: words.length,
+    sentenceCount: sentences.length || 1,
+    avgSentenceLength: Math.round(words.length / Math.max(sentences.length, 1)),
+    questionCount: (text.match(/\?/g) || []).length,
+    exclamationCount: (text.match(/!/g) || []).length,
+    firstPersonCount: (text.match(/\b(I|me|my|we|us|our)\b/gi) || []).length,
+    secondPersonCount: (text.match(/\b(you|your|yours)\b/gi) || []).length,
+    passiveVoiceCount: (text.match(/\b(was|were|is|are|been|being)\s+\w+ed\b/gi) || []).length,
+  };
+}
+
+function getDefaultToneResult(text: string): ToneResult {
   return {
     tones: [],
-    primary: { tone: "casual" as const, score: 0, label: "Casual", emoji: "💬", description: "Default", color: "#6b7280" },
+    primary: getDefaultToneScore(),
     emotionalIntensity: 0,
     tips: [],
     sentenceTones: [],
-    stats: { wordCount: 0, sentenceCount: 0, avgSentenceLength: 0, questionCount: 0, exclamationCount: 0, firstPersonCount: 0, secondPersonCount: 0, passiveVoiceCount: 0 },
+    stats: getDefaultStats(text),
   };
 }
